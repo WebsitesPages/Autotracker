@@ -1,0 +1,85 @@
+{
+  "cars": [
+    {
+      "id": "car_1773698782365",
+      "brand": "Mitsubishi",
+      "model": "Space Star",
+      "year": 2016,
+      "mileage": 81000,
+      "color": "Kristall Weiß W54",
+      "fuel": "Benzin",
+      "transmission": "Schaltung",
+      "horsepower": 80,
+      "vin": "",
+      "listedBuyPrice": 2990,
+      "purchasePrice": 2850,
+      "purchaseFunding": "pot",
+      "purchasePaidBy": "",
+      "purchaseReimbursed": false,
+      "targetSellPrice": null,
+      "listedSellPrice": null,
+      "actualSellPrice": null,
+      "purchaseDate": "2026-03-15",
+      "saleDate": null,
+      "sourcePlatform": "eBay Kleinanzeigen",
+      "sourceLink": "",
+      "sellerName": "Bernhardt ",
+      "sellerContact": "",
+      "buyerName": "",
+      "buyerContact": "",
+      "status": "purchased",
+      "notes": "Pähl",
+      "expenses": [
+        {
+          "id": "exp_1773698839324",
+          "category": "aufbereitung",
+          "amount": 20,
+          "paidBy": "mert",
+          "fundingSource": "pot",
+          "date": "2026-03-16",
+          "note": "Radkappen",
+          "reimbursed": false,
+          "createdAt": "2026-03-16T22:07:19.324Z"
+        },
+        {
+          "id": "exp_1773698880775",
+          "category": "sonstiges",
+          "amount": 22,
+          "paidBy": "mert",
+          "fundingSource": "private",
+          "date": "2026-03-16",
+          "note": "Werkzeug Schweißen",
+          "reimbursed": true,
+          "createdAt": "2026-03-16T22:08:00.775Z",
+          "reimbursedDate": "2026-03-16"
+        }
+      ],
+      "statusHistory": [
+        {
+          "status": "purchased",
+          "date": "2026-03-16T22:06:22.367Z",
+          "note": "Auto angelegt"
+        }
+      ],
+      "createdAt": "2026-03-16T22:06:22.367Z"
+    }
+  ],
+  "pot": {
+    "balance": -2892,
+    "totalInvested": 2850,
+    "totalRevenue": 0
+  },
+  "partners": [
+    {
+      "id": "mert",
+      "name": "Mert",
+      "openReimbursement": 0
+    },
+    {
+      "id": "tobias",
+      "name": "Tobias",
+      "openReimbursement": 0
+    }
+  ],
+  "potTransactions": []
+}
