@@ -13,7 +13,7 @@ const supabase = createClient(
 );
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── HELPER ────────────────────────────────────────────────────────────────
@@ -475,16 +475,40 @@ app.delete('/api/pot/transactions/:id', async (req, res) => {
   }
 });
 
-// Fotos hinzufügen (URLs nach Upload in Supabase Storage)
-app.post('/api/cars/:id/photos', async (req, res) => {
+// Foto hochladen (Base64 → Supabase Storage)
+app.post('/api/cars/:id/photos/upload', async (req, res) => {
   try {
     const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
     if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
-    const photos = [...(car.photos || []), req.body.url];
+
+    const { imageData, fileName } = req.body;
+    if (!imageData) return res.status(400).json({ error: 'Kein Bild' });
+
+    // Base64 → Buffer
+    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64, 'base64');
+
+    const ext      = (fileName || 'foto.jpg').split('.').pop().toLowerCase();
+    const filePath = `${req.params.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from('car-photos')
+      .upload(filePath, buffer, { contentType: 'image/jpeg', upsert: true });
+
+    if (uploadErr) throw uploadErr;
+
+    const { data: urlData } = supabase.storage.from('car-photos').getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+
+    const photos = [...(car.photos || []), publicUrl];
     const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
     if (error) throw error;
+
     res.json(dbCarToFrontend(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('Photo upload error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Foto löschen
@@ -492,11 +516,21 @@ app.delete('/api/cars/:id/photos', async (req, res) => {
   try {
     const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
     if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
-    const photos = (car.photos || []).filter(u => u !== req.body.url);
+
+    const { url } = req.body;
+    // Aus Storage löschen
+    const pathPart = url.split('/car-photos/')[1];
+    if (pathPart) {
+      await supabase.storage.from('car-photos').remove([pathPart]);
+    }
+
+    const photos = (car.photos || []).filter(u => u !== url);
     const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
     if (error) throw error;
     res.json(dbCarToFrontend(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Catch-all für SPA
