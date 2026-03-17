@@ -653,7 +653,7 @@ async function loadCarDetail(id) {
         <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">📸 Fotos</h3>
         <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
           + Foto hinzufügen
-          <input type="file" accept="image/*" capture="environment" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+          <input type="file" accept="image/*" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
         </label>
       </div>
       <div id="photo-upload-progress" class="hidden mb-3">
@@ -666,7 +666,7 @@ async function loadCarDetail(id) {
             <p class="text-dark-400 text-sm mb-2">Noch keine Fotos vorhanden</p>
             <label class="cursor-pointer inline-block bg-dark-700 hover:bg-dark-600 text-sm px-4 py-2 rounded-lg transition">
               📷 Foto aufnehmen / hochladen
-              <input type="file" accept="image/*" capture="environment" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+              <input type="file" accept="image/*" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
             </label>
           </div>`
         : `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -699,51 +699,59 @@ async function loadCarDetail(id) {
 }
 
 // ── FOTO UPLOAD ────────────────────────────────────────────
-const SUPABASE_URL = 'https://vytpacbdmoxzscyxcgef.supabase.co';
-let _anonKey = null;
-
-async function getAnonKey() {
-  if (_anonKey) return _anonKey;
-  const res = await fetch(API + '/api/config');
-  const cfg = await res.json();
-  _anonKey = cfg.anonKey;
-  return _anonKey;
-}
+// Upload läuft über den Server (kein direkter Supabase-Zugriff nötig)
 
 async function uploadPhotos(event, carId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
+
   const progress = document.getElementById('photo-upload-progress');
   const bar      = document.getElementById('photo-progress-bar');
-  if (progress) { progress.classList.remove('hidden'); bar.style.width = '0%'; }
+  if (progress) { progress.classList.remove('hidden'); bar.style.width = '5%'; }
 
-  const anonKey = await getAnonKey();
   let uploaded = 0;
+  let failed   = 0;
+
   for (const file of files) {
-    const compressed = await compressImage(file, 1200);
-    const ext      = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const fileName = `${carId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/car-photos/${fileName}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${anonKey}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
-      body: compressed
-    });
-    if (uploadRes.ok) {
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/car-photos/${fileName}`;
-      await fetch(API + '/api/cars/' + carId + '/photos', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: publicUrl })
+    try {
+      // Bild als Base64 komprimieren
+      const b64 = await compressToBase64(file, 1200);
+
+      const res = await fetch(API + '/api/cars/' + carId + '/photos/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData: b64, fileName: file.name })
       });
+
+      if (res.ok) {
+        uploaded++;
+      } else {
+        const err = await res.json();
+        console.error('Upload fehler:', err);
+        failed++;
+      }
+    } catch (e) {
+      console.error('Upload exception:', e);
+      failed++;
     }
-    uploaded++;
-    if (bar) bar.style.width = Math.round((uploaded / files.length) * 100) + '%';
+
+    const total = uploaded + failed;
+    if (bar) bar.style.width = Math.round((total / files.length) * 100) + '%';
   }
+
   if (progress) progress.classList.add('hidden');
-  showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
+
+  if (uploaded > 0) {
+    showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
+  }
+  if (failed > 0) {
+    showToast(`${failed} Foto${failed > 1 ? 's' : ''} fehlgeschlagen ❌`, '❌');
+  }
+
   loadCarDetail(carId);
 }
 
-async function compressImage(file, maxWidth) {
+async function compressToBase64(file, maxWidth) {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -754,26 +762,25 @@ async function compressImage(file, maxWidth) {
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
     };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
     img.src = url;
   });
 }
 
 async function deletePhoto(carId, url) {
   if (!confirm('Foto löschen?')) return;
-  const anonKey = await getAnonKey();
-  const pathPart = url.split('/car-photos/')[1];
-  if (pathPart) {
-    await fetch(`${SUPABASE_URL}/storage/v1/object/car-photos/${pathPart}`, {
-      method: 'DELETE', headers: { 'Authorization': `Bearer ${anonKey}` }
-    });
-  }
-  await fetch(API + '/api/cars/' + carId + '/photos', {
-    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+  const res = await fetch(API + '/api/cars/' + carId + '/photos', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url })
   });
-  showToast('Foto gelöscht', '🗑️');
+  if (res.ok) {
+    showToast('Foto gelöscht', '🗑️');
+  } else {
+    showToast('Fehler beim Löschen', '❌');
+  }
   loadCarDetail(carId);
 }
 
