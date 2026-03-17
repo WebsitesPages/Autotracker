@@ -648,6 +648,42 @@ async function loadCarDetail(id) {
       </div>
     </div>
 
+    <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">📸 Fotos</h3>
+        <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
+          + Foto hinzufügen
+          <input type="file" accept="image/*" capture="environment" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+        </label>
+      </div>
+      <div id="photo-upload-progress" class="hidden mb-3">
+        <div class="bg-dark-700 rounded-full h-2"><div id="photo-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all" style="width:0%"></div></div>
+        <p class="text-xs text-dark-400 mt-1">Wird hochgeladen...</p>
+      </div>
+      ${(car.photos || []).length === 0
+        ? `<div class="text-center py-8 border-2 border-dashed border-dark-600 rounded-xl">
+            <div class="text-3xl mb-2">📷</div>
+            <p class="text-dark-400 text-sm mb-2">Noch keine Fotos vorhanden</p>
+            <label class="cursor-pointer inline-block bg-dark-700 hover:bg-dark-600 text-sm px-4 py-2 rounded-lg transition">
+              📷 Foto aufnehmen / hochladen
+              <input type="file" accept="image/*" capture="environment" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+            </label>
+          </div>`
+        : `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            ${(car.photos || []).map((url, i) => `
+              <div class="relative group aspect-square">
+                <img src="${url}" class="w-full h-full object-cover rounded-xl cursor-pointer" onclick="openLightbox('${url}')" loading="lazy">
+                <button onclick="deletePhoto('${car.id}', '${url}')" class="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-500 text-white w-7 h-7 rounded-full text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">✕</button>
+                ${i === 0 ? '<span class="absolute bottom-1.5 left-1.5 bg-black/60 text-xs text-white px-2 py-0.5 rounded-full">Titelbild</span>' : ''}
+              </div>`).join('')}
+          </div>`}
+    </div>
+
+    <div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95" onclick="closeLightbox()">
+      <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain rounded-xl">
+      <button class="absolute top-4 right-4 text-white text-3xl leading-none" onclick="closeLightbox()">✕</button>
+    </div>
+
     <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
       <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">📜 Status-Verlauf</h3>
       <div class="space-y-2">
@@ -660,6 +696,100 @@ async function loadCarDetail(id) {
           </div>`).join('')}
       </div>
     </div>`;
+}
+
+// ── FOTO UPLOAD ────────────────────────────────────────────
+const SUPABASE_URL = 'https://vytpacbdmoxzscyxcgef.supabase.co';
+let _anonKey = null;
+
+async function getAnonKey() {
+  if (_anonKey) return _anonKey;
+  const res = await fetch(API + '/api/config');
+  const cfg = await res.json();
+  _anonKey = cfg.anonKey;
+  return _anonKey;
+}
+
+async function uploadPhotos(event, carId) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  const progress = document.getElementById('photo-upload-progress');
+  const bar      = document.getElementById('photo-progress-bar');
+  if (progress) { progress.classList.remove('hidden'); bar.style.width = '0%'; }
+
+  const anonKey = await getAnonKey();
+  let uploaded = 0;
+  for (const file of files) {
+    const compressed = await compressImage(file, 1200);
+    const ext      = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileName = `${carId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/car-photos/${fileName}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${anonKey}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+      body: compressed
+    });
+    if (uploadRes.ok) {
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/car-photos/${fileName}`;
+      await fetch(API + '/api/cars/' + carId + '/photos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: publicUrl })
+      });
+    }
+    uploaded++;
+    if (bar) bar.style.width = Math.round((uploaded / files.length) * 100) + '%';
+  }
+  if (progress) progress.classList.add('hidden');
+  showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
+  loadCarDetail(carId);
+}
+
+async function compressImage(file, maxWidth) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale  = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+    };
+    img.src = url;
+  });
+}
+
+async function deletePhoto(carId, url) {
+  if (!confirm('Foto löschen?')) return;
+  const anonKey = await getAnonKey();
+  const pathPart = url.split('/car-photos/')[1];
+  if (pathPart) {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/car-photos/${pathPart}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${anonKey}` }
+    });
+  }
+  await fetch(API + '/api/cars/' + carId + '/photos', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  showToast('Foto gelöscht', '🗑️');
+  loadCarDetail(carId);
+}
+
+function openLightbox(url) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.classList.remove('hidden');
+  lb.classList.add('flex');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('lightbox');
+  lb.classList.add('hidden');
+  lb.classList.remove('flex');
+  document.body.style.overflow = '';
 }
 
 // "Als gekauft markieren"
