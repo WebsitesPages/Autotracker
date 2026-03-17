@@ -122,6 +122,7 @@ function dbCarToFrontend(car) {
     notes: car.notes,
     expenses: car.expenses || [],
     statusHistory: car.status_history || [],
+    photos: car.photos || [],
     createdAt: car.created_at
   };
 }
@@ -158,10 +159,16 @@ function frontendCarToDB(data) {
   if (data.notes !== undefined) row.notes = data.notes;
   if (data.expenses !== undefined) row.expenses = data.expenses;
   if (data.statusHistory !== undefined) row.status_history = data.statusHistory;
+  if (data.photos !== undefined) row.photos = data.photos;
   return row;
 }
 
 // ─── API ROUTES ────────────────────────────────────────────────────────────
+
+// Config für Frontend (Supabase Anon Key)
+app.get('/api/config', (req, res) => {
+  res.json({ anonKey: process.env.SUPABASE_KEY });
+});
 
 // Alle Daten
 app.get('/api/data', async (req, res) => {
@@ -466,6 +473,30 @@ app.delete('/api/pot/transactions/:id', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Fotos hinzufügen (URLs nach Upload in Supabase Storage)
+app.post('/api/cars/:id/photos', async (req, res) => {
+  try {
+    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
+    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const photos = [...(car.photos || []), req.body.url];
+    const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
+    if (error) throw error;
+    res.json(dbCarToFrontend(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Foto löschen
+app.delete('/api/cars/:id/photos', async (req, res) => {
+  try {
+    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
+    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const photos = (car.photos || []).filter(u => u !== req.body.url);
+    const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
+    if (error) throw error;
+    res.json(dbCarToFrontend(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Catch-all für SPA
