@@ -1033,7 +1033,7 @@ function toggleRoundtrip() {
 
 async function tankSuggest(field) {
   clearTimeout(tankSuggestTimeout);
-  const input = document.getElementById('tank-' + field);
+  const input  = document.getElementById('tank-' + field);
   const sugBox = document.getElementById('tank-' + field + '-suggestions');
   const q = input.value.trim();
   if (q.length < 3) { sugBox.classList.add('hidden'); return; }
@@ -1045,21 +1045,56 @@ async function tankSuggest(field) {
       const data = await res.json();
       if (!data.length) { sugBox.classList.add('hidden'); return; }
 
-      sugBox.innerHTML = data.map(item => `
-        <div class="px-3 py-2.5 hover:bg-dark-600 cursor-pointer text-sm border-b border-dark-600 last:border-0 transition"
-          onclick="tankSelectAddress('${field}', ${item.lat}, ${item.lon}, ${JSON.stringify(item.display_name).replace(/'/g,"&#39;")})">
-          <div class="font-medium text-dark-100 truncate">${item.display_name.split(',').slice(0,2).join(',')}</div>
-          <div class="text-xs text-dark-400 truncate">${item.display_name}</div>
-        </div>`).join('');
+      sugBox.innerHTML = '';
+      data.forEach(item => {
+        // Deutsches Adressformat: Straße Hausnummer, Ort
+        const a = item.address || {};
+        const parts = [];
+        if (a.road) {
+          parts.push(a.road + (a.house_number ? ' ' + a.house_number : ''));
+        }
+        if (a.city || a.town || a.village || a.municipality) {
+          parts.push(a.city || a.town || a.village || a.municipality);
+        }
+        if (a.state) parts.push(a.state);
+        const shortName = parts.length ? parts.join(', ') : item.display_name.split(',').slice(0,2).join(',');
+
+        const div = document.createElement('div');
+        div.className = 'px-3 py-2.5 active:bg-dark-600 cursor-pointer text-sm border-b border-dark-600 last:border-0';
+        div.innerHTML = '<div class="font-medium text-dark-100">' + shortName + '</div><div class="text-xs text-dark-400 truncate">' + item.display_name + '</div>';
+
+        // mousedown statt onclick – funktioniert auf iOS bevor blur feuert
+        div.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          tankSelectAddress(field, item.lat, item.lon, shortName);
+        });
+        div.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          tankSelectAddress(field, item.lat, item.lon, shortName);
+        }, { passive: false });
+
+        sugBox.appendChild(div);
+      });
       sugBox.classList.remove('hidden');
     } catch(e) { sugBox.classList.add('hidden'); }
   }, 400);
 }
 
+// Suggestions schließen wenn außerhalb getippt wird
+document.addEventListener('click', (e) => {
+  ['start', 'end'].forEach(field => {
+    const input  = document.getElementById('tank-' + field);
+    const sugBox = document.getElementById('tank-' + field + '-suggestions');
+    if (input && sugBox && !input.contains(e.target) && !sugBox.contains(e.target)) {
+      sugBox.classList.add('hidden');
+    }
+  });
+});
+
 let tankCoords = { start: null, end: null };
 
-function tankSelectAddress(field, lat, lon, displayName) {
-  document.getElementById('tank-' + field).value = displayName.split(',').slice(0,2).join(',').trim();
+function tankSelectAddress(field, lat, lon, shortName) {
+  document.getElementById('tank-' + field).value = shortName;
   document.getElementById('tank-' + field + '-suggestions').classList.add('hidden');
   tankCoords[field] = { lat: parseFloat(lat), lon: parseFloat(lon) };
 }
