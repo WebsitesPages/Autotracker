@@ -305,25 +305,110 @@
   <!-- MODAL: Expense -->
   <div id="expense-modal" class="fixed inset-0 z-50 hidden">
     <div class="modal-overlay absolute inset-0" onclick="closeExpenseModal()"></div>
-    <div class="relative z-10 max-w-md mx-auto mt-20 bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
-      <div class="border-b border-dark-700 px-6 py-4 flex justify-between items-center">
+    <div class="relative z-10 max-w-lg mx-auto mt-10 max-h-[90vh] overflow-y-auto bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
+      <div class="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
         <h2 class="text-lg font-bold">Ausgabe hinzufügen</h2>
         <button onclick="closeExpenseModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="expense-form" onsubmit="saveExpense(event)" class="p-6 space-y-4">
         <input type="hidden" id="exp-car-id">
+
         <div>
           <label class="text-xs text-dark-400 mb-1 block">Kategorie</label>
-          <select id="exp-category" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
-            <option value="reparatur">Reparatur</option><option value="tuev">TÜV / AU</option>
-            <option value="zulassung">Zulassung / Abmeldung</option><option value="aufbereitung">Aufbereitung</option>
-            <option value="transport">Transport / Überführung</option><option value="inserat">Inserat-Kosten</option>
-            <option value="versicherung">Versicherung</option><option value="steuer">Steuer</option>
-            <option value="tanken">Tanken</option><option value="besichtigung">Besichtigungskosten</option>
+          <select id="exp-category" onchange="onCategoryChange()" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+            <option value="reparatur">Reparatur</option>
+            <option value="tuev">TÜV / AU</option>
+            <option value="zulassung">Zulassung / Abmeldung</option>
+            <option value="aufbereitung">Aufbereitung</option>
+            <option value="transport">Transport / Überführung</option>
+            <option value="inserat">Inserat-Kosten</option>
+            <option value="versicherung">Versicherung</option>
+            <option value="steuer">Steuer</option>
+            <option value="tanken">⛽ Tanken</option>
+            <option value="besichtigung">Besichtigungskosten</option>
             <option value="sonstiges">Sonstiges</option>
           </select>
         </div>
-        <div><label class="text-xs text-dark-400 mb-1 block">Betrag (€) *</label><input id="exp-amount" type="number" step="0.01" required class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="250.00"></div>
+
+        <!-- TANKRECHNER -->
+        <div id="tank-rechner" class="hidden">
+          <div class="bg-dark-700/60 border border-warn-400/20 rounded-xl p-4 space-y-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-lg">⛽</span>
+              <span class="text-sm font-semibold text-warn-400">Tankrechner</span>
+              <span class="text-xs text-dark-400 ml-auto">optional</span>
+            </div>
+
+            <div class="relative">
+              <label class="text-xs text-dark-400 mb-1 block">📍 Startadresse</label>
+              <input id="tank-start" type="text" autocomplete="off"
+                class="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400"
+                placeholder="z.B. Münchner Str. 1, München"
+                oninput="tankSuggest('start')">
+              <div id="tank-start-suggestions" class="absolute z-50 w-full bg-dark-700 border border-dark-600 rounded-lg mt-1 shadow-xl hidden max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div class="relative">
+              <label class="text-xs text-dark-400 mb-1 block">🏁 Zieladresse</label>
+              <input id="tank-end" type="text" autocomplete="off"
+                class="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400"
+                placeholder="z.B. Autobahnausfahrt Augsburg"
+                oninput="tankSuggest('end')">
+              <div id="tank-end-suggestions" class="absolute z-50 w-full bg-dark-700 border border-dark-600 rounded-lg mt-1 shadow-xl hidden max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button type="button" id="tank-roundtrip-btn" onclick="toggleRoundtrip()"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition bg-dark-600 border-dark-500 text-dark-300">
+                <span id="tank-roundtrip-icon">○</span>
+                <span>Hin & Zurück</span>
+              </button>
+              <button type="button" onclick="berechneStrecke()"
+                class="flex-1 bg-dark-600 hover:bg-dark-500 border border-dark-500 text-sm py-1.5 rounded-lg transition">
+                🗺️ Strecke berechnen
+              </button>
+            </div>
+
+            <div id="tank-route-result" class="hidden bg-dark-800 rounded-lg px-3 py-2 text-sm flex justify-between items-center">
+              <span class="text-dark-400">Berechnete Strecke</span>
+              <span id="tank-km" class="font-bold text-warn-400">– km</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-dark-400 mb-1 block">💧 Verbrauch (L/100km)</label>
+                <input id="tank-verbrauch" type="number" step="0.1" min="0"
+                  class="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400"
+                  placeholder="8.5" oninput="berechneTankkosten()">
+              </div>
+              <div>
+                <label class="text-xs text-dark-400 mb-1 block">💶 Preis/Liter (€)</label>
+                <input id="tank-preis" type="number" step="0.001" min="0"
+                  class="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400"
+                  placeholder="1.799" oninput="berechneTankkosten()">
+              </div>
+            </div>
+
+            <div id="tank-kosten-result" class="hidden bg-warn-400/10 border border-warn-400/30 rounded-lg p-3">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-dark-300">Geschätzte Tankkosten</span>
+                <span id="tank-kosten-display" class="text-lg font-bold text-warn-400">0,00 €</span>
+              </div>
+              <button type="button" onclick="tankKostenUebernehmen()"
+                class="w-full bg-warn-400 hover:bg-warn-500 text-dark-900 font-medium text-sm py-1.5 rounded-lg transition">
+                ✓ Betrag übernehmen
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Betrag (€) *</label>
+          <input id="exp-amount" type="number" step="0.01" required
+            class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+            placeholder="250.00">
+        </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-dark-400 mb-1 block">Bezahlt aus</label>
@@ -338,8 +423,14 @@
             </select>
           </div>
         </div>
-        <div><label class="text-xs text-dark-400 mb-1 block">Datum</label><input id="exp-date" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"></div>
-        <div><label class="text-xs text-dark-400 mb-1 block">Notiz</label><input id="exp-note" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. Fahrtkosten zur Besichtigung"></div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Datum</label>
+          <input id="exp-date" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Notiz</label>
+          <input id="exp-note" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. Fahrtkosten zur Besichtigung">
+        </div>
         <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-lg font-medium transition">Ausgabe speichern</button>
       </form>
     </div>
@@ -714,8 +805,9 @@ async function uploadPhotos(event, carId) {
 
   for (const file of files) {
     try {
-      // Bild als Base64 komprimieren
-      const b64 = await compressToBase64(file, 1200);
+      // Bild stark komprimieren: max 800px, Qualität 70%
+      const b64 = await compressToBase64(file, 800, 0.7);
+      console.log('Bildgröße nach Komprimierung:', Math.round(b64.length / 1024), 'KB');
 
       const res = await fetch(API + '/api/cars/' + carId + '/photos/upload', {
         method: 'POST',
@@ -723,11 +815,13 @@ async function uploadPhotos(event, carId) {
         body: JSON.stringify({ imageData: b64, fileName: file.name })
       });
 
+      const data = await res.json();
+      console.log('Server Antwort:', res.status, data);
+
       if (res.ok) {
         uploaded++;
       } else {
-        const err = await res.json();
-        console.error('Upload fehler:', err);
+        console.error('Upload fehler:', data);
         failed++;
       }
     } catch (e) {
@@ -741,17 +835,13 @@ async function uploadPhotos(event, carId) {
 
   if (progress) progress.classList.add('hidden');
 
-  if (uploaded > 0) {
-    showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
-  }
-  if (failed > 0) {
-    showToast(`${failed} Foto${failed > 1 ? 's' : ''} fehlgeschlagen ❌`, '❌');
-  }
+  if (uploaded > 0) showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
+  if (failed > 0)   showToast(`${failed} Foto fehlgeschlagen – siehe Render Logs`, '❌');
 
   loadCarDetail(carId);
 }
 
-async function compressToBase64(file, maxWidth) {
+async function compressToBase64(file, maxWidth, quality = 0.7) {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -762,7 +852,7 @@ async function compressToBase64(file, maxWidth) {
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
+      resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
     img.src = url;
@@ -910,12 +1000,139 @@ async function deleteCar(id) {
 }
 
 // EXPENSES
+// ── TANKRECHNER ────────────────────────────────────────────
+let tankRoundtrip = false;
+let tankDistanceKm = 0;
+let tankSuggestTimeout = null;
+
+function onCategoryChange() {
+  const cat = document.getElementById('exp-category').value;
+  const rechner = document.getElementById('tank-rechner');
+  if (cat === 'tanken') {
+    rechner.classList.remove('hidden');
+  } else {
+    rechner.classList.add('hidden');
+  }
+}
+
+function toggleRoundtrip() {
+  tankRoundtrip = !tankRoundtrip;
+  const btn  = document.getElementById('tank-roundtrip-btn');
+  const icon = document.getElementById('tank-roundtrip-icon');
+  if (tankRoundtrip) {
+    btn.classList.add('bg-warn-400/20', 'border-warn-400/40', 'text-warn-400');
+    btn.classList.remove('bg-dark-600', 'border-dark-500', 'text-dark-300');
+    icon.textContent = '●';
+  } else {
+    btn.classList.remove('bg-warn-400/20', 'border-warn-400/40', 'text-warn-400');
+    btn.classList.add('bg-dark-600', 'border-dark-500', 'text-dark-300');
+    icon.textContent = '○';
+  }
+  if (tankDistanceKm > 0) berechneTankkosten();
+}
+
+async function tankSuggest(field) {
+  clearTimeout(tankSuggestTimeout);
+  const input = document.getElementById('tank-' + field);
+  const sugBox = document.getElementById('tank-' + field + '-suggestions');
+  const q = input.value.trim();
+  if (q.length < 3) { sugBox.classList.add('hidden'); return; }
+
+  tankSuggestTimeout = setTimeout(async () => {
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=' + encodeURIComponent(q);
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      const data = await res.json();
+      if (!data.length) { sugBox.classList.add('hidden'); return; }
+
+      sugBox.innerHTML = data.map(item => `
+        <div class="px-3 py-2.5 hover:bg-dark-600 cursor-pointer text-sm border-b border-dark-600 last:border-0 transition"
+          onclick="tankSelectAddress('${field}', ${item.lat}, ${item.lon}, ${JSON.stringify(item.display_name).replace(/'/g,"&#39;")})">
+          <div class="font-medium text-dark-100 truncate">${item.display_name.split(',').slice(0,2).join(',')}</div>
+          <div class="text-xs text-dark-400 truncate">${item.display_name}</div>
+        </div>`).join('');
+      sugBox.classList.remove('hidden');
+    } catch(e) { sugBox.classList.add('hidden'); }
+  }, 400);
+}
+
+let tankCoords = { start: null, end: null };
+
+function tankSelectAddress(field, lat, lon, displayName) {
+  document.getElementById('tank-' + field).value = displayName.split(',').slice(0,2).join(',').trim();
+  document.getElementById('tank-' + field + '-suggestions').classList.add('hidden');
+  tankCoords[field] = { lat: parseFloat(lat), lon: parseFloat(lon) };
+}
+
+async function berechneStrecke() {
+  const start = tankCoords.start;
+  const end   = tankCoords.end;
+  if (!start || !end) {
+    showToast('Bitte beide Adressen auswählen', '⚠️'); return;
+  }
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=false`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!data.routes || !data.routes[0]) { showToast('Route nicht gefunden', '❌'); return; }
+
+    let km = data.routes[0].distance / 1000;
+    if (tankRoundtrip) km *= 2;
+    tankDistanceKm = km;
+
+    document.getElementById('tank-km').textContent = km.toFixed(1) + ' km' + (tankRoundtrip ? ' (Hin & Zurück)' : '');
+    document.getElementById('tank-route-result').classList.remove('hidden');
+    berechneTankkosten();
+  } catch(e) {
+    showToast('Fehler bei der Routenberechnung', '❌');
+  }
+}
+
+function berechneTankkosten() {
+  const verbrauch = parseFloat(document.getElementById('tank-verbrauch').value);
+  const preis     = parseFloat(document.getElementById('tank-preis').value);
+  const resultDiv = document.getElementById('tank-kosten-result');
+
+  if (!tankDistanceKm || !verbrauch || !preis) { resultDiv.classList.add('hidden'); return; }
+
+  const liter  = (tankDistanceKm / 100) * verbrauch;
+  const kosten = liter * preis;
+
+  document.getElementById('tank-kosten-display').textContent =
+    kosten.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  resultDiv.classList.remove('hidden');
+}
+
+function tankKostenUebernehmen() {
+  const verbrauch = parseFloat(document.getElementById('tank-verbrauch').value);
+  const preis     = parseFloat(document.getElementById('tank-preis').value);
+  if (!tankDistanceKm || !verbrauch || !preis) return;
+  const kosten = (tankDistanceKm / 100) * verbrauch * preis;
+  document.getElementById('exp-amount').value = kosten.toFixed(2);
+  showToast('Betrag übernommen ✓');
+}
+
+// ── EXPENSE MODAL ──────────────────────────────────────────
 function openExpenseModal(carId) {
   document.getElementById('expense-modal').classList.remove('hidden');
   document.getElementById('exp-car-id').value = carId;
   document.getElementById('expense-form').reset();
   document.getElementById('exp-car-id').value = carId;
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+  // Tankrechner zurücksetzen
+  document.getElementById('tank-rechner').classList.add('hidden');
+  document.getElementById('tank-route-result').classList.add('hidden');
+  document.getElementById('tank-kosten-result').classList.add('hidden');
+  document.getElementById('tank-start-suggestions').classList.add('hidden');
+  document.getElementById('tank-end-suggestions').classList.add('hidden');
+  tankDistanceKm = 0;
+  tankRoundtrip  = false;
+  tankCoords     = { start: null, end: null };
+  const btn = document.getElementById('tank-roundtrip-btn');
+  btn.classList.remove('bg-warn-400/20', 'border-warn-400/40', 'text-warn-400');
+  btn.classList.add('bg-dark-600', 'border-dark-500', 'text-dark-300');
+  document.getElementById('tank-roundtrip-icon').textContent = '○';
 }
 function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
 
