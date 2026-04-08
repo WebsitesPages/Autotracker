@@ -741,87 +741,38 @@ async function loadCarDetail(id) {
 
     <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">📎 Fotos & Dokumente</h3>
-        <div class="flex gap-2">
-          <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
-            📷 Foto
-            <input type="file" accept="image/*" multiple class="hidden" onchange="uploadDateien(event, '${car.id}', 'photo')">
-          </label>
-          <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
-            📄 PDF
-            <input type="file" accept="application/pdf" multiple class="hidden" onchange="uploadDateien(event, '${car.id}', 'pdf')">
-          </label>
-        </div>
+        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">📸 Fotos</h3>
+        <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
+          + Foto hinzufügen
+          <input type="file" accept="image/*" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+        </label>
       </div>
       <div id="photo-upload-progress" class="hidden mb-3">
         <div class="bg-dark-700 rounded-full h-2"><div id="photo-progress-bar" class="bg-brand-500 h-2 rounded-full transition-all" style="width:0%"></div></div>
-        <p class="text-xs text-dark-400 mt-1" id="upload-progress-text">Wird hochgeladen...</p>
+        <p class="text-xs text-dark-400 mt-1">Wird hochgeladen...</p>
       </div>
-      ${(() => {
-        const photos = (car.photos || []).filter(u => !u.endsWith('.pdf') && !u.includes('|pdf|'));
-        const pdfs   = (car.photos || []).filter(u => u.endsWith('.pdf') || u.includes('|pdf|'));
-        const allEmpty = photos.length === 0 && pdfs.length === 0;
-        if (allEmpty) return \`<div class="text-center py-8 border-2 border-dashed border-dark-600 rounded-xl">
-            <div class="text-3xl mb-2">📎</div>
-            <p class="text-dark-400 text-sm mb-3">Noch keine Dateien vorhanden</p>
-            <div class="flex gap-2 justify-center flex-wrap">
-              <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-sm px-4 py-2 rounded-lg transition">
-                📷 Foto hochladen
-                <input type="file" accept="image/*" multiple class="hidden" onchange="uploadDateien(event, '\${car.id}', 'photo')">
-              </label>
-              <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 text-sm px-4 py-2 rounded-lg transition">
-                📄 PDF hochladen
-                <input type="file" accept="application/pdf" multiple class="hidden" onchange="uploadDateien(event, '\${car.id}', 'pdf')">
-              </label>
-            </div>
-          </div>\`;
-        let html = '';
-        if (photos.length > 0) {
-          html += \`<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-            \${photos.map((url, i) => \`
+      ${(car.photos || []).length === 0
+        ? `<div class="text-center py-8 border-2 border-dashed border-dark-600 rounded-xl">
+            <div class="text-3xl mb-2">📷</div>
+            <p class="text-dark-400 text-sm mb-2">Noch keine Fotos vorhanden</p>
+            <label class="cursor-pointer inline-block bg-dark-700 hover:bg-dark-600 text-sm px-4 py-2 rounded-lg transition">
+              📷 Foto aufnehmen / hochladen
+              <input type="file" accept="image/*" multiple class="hidden" onchange="uploadPhotos(event, '${car.id}')">
+            </label>
+          </div>`
+        : `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            ${(car.photos || []).map((url, i) => `
               <div class="relative group aspect-square">
-                <img src="\${url}" class="w-full h-full object-cover rounded-xl cursor-pointer" onclick="openLightbox('\${url}')" loading="lazy">
-                <button onclick="deletePhoto('\${car.id}', '\${url}')" class="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-500 text-white w-7 h-7 rounded-full text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">✕</button>
-                \${i === 0 ? '<span class=\"absolute bottom-1.5 left-1.5 bg-black/60 text-xs text-white px-2 py-0.5 rounded-full\">Titelbild</span>' : ''}
-              </div>\`).join('')}
-          </div>\`;
-        }
-        if (pdfs.length > 0) {
-          html += \`<div class="space-y-2">
-            \${pdfs.map(url => {
-              const rawUrl = url.includes('|pdf|') ? url.split('|pdf|')[1] : url;
-              const name   = url.includes('|pdf|') ? url.split('|pdf|')[0] : decodeURIComponent(rawUrl.split('/').pop().replace(/\.pdf$/i,''));
-              return \`<div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">
-                <div class="flex items-center gap-3">
-                  <span class="text-2xl">📄</span>
-                  <div>
-                    <div class="text-sm font-medium truncate max-w-[200px]">\${name}</div>
-                    <div class="text-xs text-dark-400">PDF Dokument</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button onclick="openPDF('\${rawUrl}')" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg transition">Öffnen</button>
-                  <button onclick="deletePhoto('\${car.id}', '\${url}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm">🗑️</button>
-                </div>
-              </div>\`;
-            }).join('')}
-          </div>\`;
-        }
-        return html;
-      })()}
+                <img src="${url}" class="w-full h-full object-cover rounded-xl cursor-pointer" onclick="openLightbox('${url}')" loading="lazy">
+                <button onclick="deletePhoto('${car.id}', '${url}')" class="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-500 text-white w-7 h-7 rounded-full text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">✕</button>
+                ${i === 0 ? '<span class="absolute bottom-1.5 left-1.5 bg-black/60 text-xs text-white px-2 py-0.5 rounded-full">Titelbild</span>' : ''}
+              </div>`).join('')}
+          </div>`}
     </div>
 
     <div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95" onclick="closeLightbox()">
       <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain rounded-xl">
       <button class="absolute top-4 right-4 text-white text-3xl leading-none" onclick="closeLightbox()">✕</button>
-    </div>
-
-    <div id="pdf-viewer" class="fixed inset-0 z-50 hidden flex-col bg-dark-900">
-      <div class="flex items-center justify-between px-4 py-3 bg-dark-800 border-b border-dark-700">
-        <span class="text-sm font-medium">📄 PDF Dokument</span>
-        <button onclick="closePDF()" class="text-dark-400 hover:text-white text-xl px-2">✕ Schließen</button>
-      </div>
-      <iframe id="pdf-frame" src="" class="flex-1 w-full border-0"></iframe>
     </div>
 
     <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
@@ -838,62 +789,56 @@ async function loadCarDetail(id) {
     </div>`;
 }
 
-// ── DATEI UPLOAD (Fotos + PDFs) ────────────────────────────
+// ── FOTO UPLOAD ────────────────────────────────────────────
+// Upload läuft über den Server (kein direkter Supabase-Zugriff nötig)
 
-async function uploadDateien(event, carId, type) {
+async function uploadPhotos(event, carId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
 
   const progress = document.getElementById('photo-upload-progress');
   const bar      = document.getElementById('photo-progress-bar');
-  const text     = document.getElementById('upload-progress-text');
   if (progress) { progress.classList.remove('hidden'); bar.style.width = '5%'; }
 
-  let uploaded = 0, failed = 0;
+  let uploaded = 0;
+  let failed   = 0;
 
   for (const file of files) {
     try {
-      let payload;
-      if (type === 'pdf') {
-        // PDF als Base64
-        const b64 = await fileToBase64(file);
-        payload = { pdfData: b64, fileName: file.name, type: 'pdf' };
-        if (text) text.textContent = `PDF wird hochgeladen: ${file.name}`;
-      } else {
-        // Bild komprimieren
-        const b64 = await compressToBase64(file, 800, 0.7);
-        payload = { imageData: b64, fileName: file.name, type: 'photo' };
-        if (text) text.textContent = `Foto wird hochgeladen...`;
-      }
+      // Bild stark komprimieren: max 800px, Qualität 70%
+      const b64 = await compressToBase64(file, 800, 0.7);
+      console.log('Bildgröße nach Komprimierung:', Math.round(b64.length / 1024), 'KB');
 
       const res = await fetch(API + '/api/cars/' + carId + '/photos/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ imageData: b64, fileName: file.name })
       });
 
-      if (res.ok) { uploaded++; }
-      else { const e = await res.json(); console.error('Upload fehler:', e); failed++; }
+      const data = await res.json();
+      console.log('Server Antwort:', res.status, data);
+
+      if (res.ok) {
+        uploaded++;
+      } else {
+        console.error('Upload fehler:', data);
+        failed++;
+      }
     } catch (e) {
-      console.error('Upload exception:', e); failed++;
+      console.error('Upload exception:', e);
+      failed++;
     }
+
     const total = uploaded + failed;
     if (bar) bar.style.width = Math.round((total / files.length) * 100) + '%';
   }
 
   if (progress) progress.classList.add('hidden');
-  if (uploaded > 0) showToast(`${uploaded} Datei${uploaded > 1 ? 'en' : ''} hochgeladen ✅`);
-  if (failed > 0)   showToast(`${failed} Datei(en) fehlgeschlagen ❌`, '❌');
-  loadCarDetail(carId);
-}
 
-async function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  if (uploaded > 0) showToast(`${uploaded} Foto${uploaded > 1 ? 's' : ''} hochgeladen 📸`);
+  if (failed > 0)   showToast(`${failed} Foto fehlgeschlagen – siehe Render Logs`, '❌');
+
+  loadCarDetail(carId);
 }
 
 async function compressToBase64(file, maxWidth, quality = 0.7) {
@@ -915,14 +860,17 @@ async function compressToBase64(file, maxWidth, quality = 0.7) {
 }
 
 async function deletePhoto(carId, url) {
-  if (!confirm('Datei löschen?')) return;
+  if (!confirm('Foto löschen?')) return;
   const res = await fetch(API + '/api/cars/' + carId + '/photos', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url })
   });
-  if (res.ok) showToast('Datei gelöscht', '🗑️');
-  else showToast('Fehler beim Löschen', '❌');
+  if (res.ok) {
+    showToast('Foto gelöscht', '🗑️');
+  } else {
+    showToast('Fehler beim Löschen', '❌');
+  }
   loadCarDetail(carId);
 }
 
@@ -938,22 +886,6 @@ function closeLightbox() {
   const lb = document.getElementById('lightbox');
   lb.classList.add('hidden');
   lb.classList.remove('flex');
-  document.body.style.overflow = '';
-}
-
-function openPDF(url) {
-  const viewer = document.getElementById('pdf-viewer');
-  document.getElementById('pdf-frame').src = url;
-  viewer.classList.remove('hidden');
-  viewer.classList.add('flex');
-  document.body.style.overflow = 'hidden';
-}
-
-function closePDF() {
-  const viewer = document.getElementById('pdf-viewer');
-  document.getElementById('pdf-frame').src = '';
-  viewer.classList.add('hidden');
-  viewer.classList.remove('flex');
   document.body.style.overflow = '';
 }
 
