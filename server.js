@@ -475,60 +475,49 @@ app.delete('/api/pot/transactions/:id', async (req, res) => {
   }
 });
 
-// Foto hochladen (Base64 → Supabase Storage)
+// Datei hochladen (Foto oder PDF → Supabase Storage)
 app.post('/api/cars/:id/photos/upload', async (req, res) => {
   try {
-    console.log('📸 Photo upload gestartet für Auto:', req.params.id);
-
     const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) {
-      console.error('Auto nicht gefunden:', fetchErr);
-      return res.status(404).json({ error: 'Nicht gefunden' });
-    }
+    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
 
-    const { imageData, fileName } = req.body;
-    if (!imageData) {
-      console.error('Kein imageData im Request');
-      return res.status(400).json({ error: 'Kein Bild' });
-    }
+    const { imageData, pdfData, fileName, type } = req.body;
+    const isPdf  = type === 'pdf' && pdfData;
+    const rawB64 = isPdf ? pdfData : imageData;
+    if (!rawB64) return res.status(400).json({ error: 'Keine Datei' });
 
-    console.log('📦 Bildgröße (Base64):', Math.round(imageData.length / 1024), 'KB');
-
-    // Base64 → Buffer
-    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = rawB64.replace(/^data:[^;]+;base64,/, '');
     const buffer = Buffer.from(base64, 'base64');
-    console.log('📦 Buffer-Größe:', Math.round(buffer.length / 1024), 'KB');
+    console.log(`📦 ${isPdf ? 'PDF' : 'Foto'} Upload:`, Math.round(buffer.length / 1024), 'KB');
 
-    const ext      = (fileName || 'foto.jpg').split('.').pop().toLowerCase();
+    const ext      = isPdf ? 'pdf' : (fileName || 'foto.jpg').split('.').pop().toLowerCase();
     const filePath = `${req.params.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    console.log('📁 Upload-Pfad:', filePath);
+    const mimeType = isPdf ? 'application/pdf' : 'image/jpeg';
 
     const { error: uploadErr } = await supabase.storage
       .from('car-photos')
-      .upload(filePath, buffer, { contentType: 'image/jpeg', upsert: true });
+      .upload(filePath, buffer, { contentType: mimeType, upsert: true });
 
     if (uploadErr) {
-      console.error('❌ Supabase Storage Fehler:', uploadErr);
-      throw uploadErr;
+      console.error('Storage Fehler:', uploadErr.message);
+      return res.status(500).json({ error: uploadErr.message });
     }
-
-    console.log('✅ Storage Upload erfolgreich');
 
     const { data: urlData } = supabase.storage.from('car-photos').getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
-    console.log('🔗 Public URL:', publicUrl);
 
-    const photos = [...(car.photos || []), publicUrl];
+    // PDFs als "name|pdf|url" speichern damit Frontend den Dateinamen kennt
+    const safeName  = (fileName || 'Dokument').replace(/[|]/g, '_').replace(/\.pdf$/i, '');
+    const storedUrl = isPdf ? `${safeName}|pdf|${publicUrl}` : publicUrl;
+
+    const photos = [...(car.photos || []), storedUrl];
     const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
-    if (error) {
-      console.error('❌ DB Update Fehler:', error);
-      throw error;
-    }
+    if (error) return res.status(500).json({ error: error.message });
 
-    console.log('✅ DB Update erfolgreich, Fotos gesamt:', photos.length);
+    console.log('✅ Gespeichert:', isPdf ? 'PDF' : 'Foto', photos.length, 'Dateien gesamt');
     res.json(dbCarToFrontend(data));
   } catch (e) {
-    console.error('❌ Photo upload Gesamtfehler:', e.message, e);
+    console.error('Upload Fehler:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
