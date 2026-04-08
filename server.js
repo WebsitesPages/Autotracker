@@ -194,7 +194,7 @@ app.get('/api/stats', async (req, res) => {
     const calc = await recalculate();
 
     const frontendCars = (cars || []).map(dbCarToFrontend);
-    const activeCars = frontendCars.filter(c => c.status !== 'sold');
+    const activeCars = frontendCars.filter(c => c.status !== 'sold' && c.status !== 'visited');
     const soldCars = frontendCars.filter(c => c.status === 'sold');
 
     let totalProfit = 0;
@@ -478,35 +478,57 @@ app.delete('/api/pot/transactions/:id', async (req, res) => {
 // Foto hochladen (Base64 → Supabase Storage)
 app.post('/api/cars/:id/photos/upload', async (req, res) => {
   try {
+    console.log('📸 Photo upload gestartet für Auto:', req.params.id);
+
     const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    if (fetchErr || !car) {
+      console.error('Auto nicht gefunden:', fetchErr);
+      return res.status(404).json({ error: 'Nicht gefunden' });
+    }
 
     const { imageData, fileName } = req.body;
-    if (!imageData) return res.status(400).json({ error: 'Kein Bild' });
+    if (!imageData) {
+      console.error('Kein imageData im Request');
+      return res.status(400).json({ error: 'Kein Bild' });
+    }
+
+    console.log('📦 Bildgröße (Base64):', Math.round(imageData.length / 1024), 'KB');
 
     // Base64 → Buffer
     const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64, 'base64');
+    console.log('📦 Buffer-Größe:', Math.round(buffer.length / 1024), 'KB');
 
     const ext      = (fileName || 'foto.jpg').split('.').pop().toLowerCase();
     const filePath = `${req.params.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    console.log('📁 Upload-Pfad:', filePath);
 
     const { error: uploadErr } = await supabase.storage
       .from('car-photos')
       .upload(filePath, buffer, { contentType: 'image/jpeg', upsert: true });
 
-    if (uploadErr) throw uploadErr;
+    if (uploadErr) {
+      console.error('❌ Supabase Storage Fehler:', uploadErr);
+      throw uploadErr;
+    }
+
+    console.log('✅ Storage Upload erfolgreich');
 
     const { data: urlData } = supabase.storage.from('car-photos').getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
+    console.log('🔗 Public URL:', publicUrl);
 
     const photos = [...(car.photos || []), publicUrl];
     const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
-    if (error) throw error;
+    if (error) {
+      console.error('❌ DB Update Fehler:', error);
+      throw error;
+    }
 
+    console.log('✅ DB Update erfolgreich, Fotos gesamt:', photos.length);
     res.json(dbCarToFrontend(data));
   } catch (e) {
-    console.error('Photo upload error:', e);
+    console.error('❌ Photo upload Gesamtfehler:', e.message, e);
     res.status(500).json({ error: e.message });
   }
 });
