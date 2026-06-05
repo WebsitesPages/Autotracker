@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🚗 Auto-Tracker | Mert & Tobias</title>
+  <title>AutoTracker · Mert &amp; Tobias</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <!-- PDF.js: rendert ALLE Seiten (iframe zeigt auf iOS nur Seite 1) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
@@ -13,6 +13,8 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
   </script>
+  <!-- Lucide: professionelle Strich-Icons statt Emojis -->
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -20,59 +22,103 @@
         extend: {
           fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
-            dark: { 50:'#f8fafc',100:'#e2e8f0',200:'#cbd5e1',300:'#94a3b8',400:'#64748b',500:'#475569',600:'#334155',700:'#1e293b',800:'#0f172a',900:'#020617' },
-            brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+            // Tiefes, kühles Neutral (Fintech-Look)
+            dark: { 50:'#f7f9fc',100:'#e6eaf2',200:'#cbd3e1',300:'#9aa4b8',400:'#6b7689',500:'#3d4861',600:'#283246',700:'#1a2233',800:'#121826',900:'#0a0e1a' },
+            // Primär: Violett-Indigo (wertig)
+            brand: { 50:'#f1eefe',100:'#e4ddfd',200:'#c8bafb',300:'#a78bfa',400:'#9472f7',500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' },
+            // Positiv / Geld: Emerald
             accent: { 400:'#34d399',500:'#10b981',600:'#059669' },
             warn: { 400:'#fbbf24',500:'#f59e0b' },
-            danger: { 400:'#f87171',500:'#ef4444',600:'#dc2626' }
+            // Verlust / Gefahr: Rose (weicher als Knallrot)
+            danger: { 400:'#fb7185',500:'#f43f5e',600:'#e11d48' }
           }
         }
       }
     }
   </script>
   <style>
-    * { scrollbar-width: thin; scrollbar-color: #334155 #0f172a; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    .fade-in { animation: fadeIn 0.3s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .slide-in { animation: slideIn 0.3s ease-out; }
-    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-    .pulse-green { animation: pulseG 2s infinite; }
-    @keyframes pulseG { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
-    .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+    /* ── Grund-Look ───────────────────────────────────────────── */
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-variant-numeric: tabular-nums;          /* Zahlen richten sich sauber aus */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.011em;
+      /* Dezenter violetter Lichtschein oben + tiefes Neutral */
+      background:
+        radial-gradient(1200px 620px at 50% -260px, rgba(124,58,237,0.16), transparent 70%),
+        radial-gradient(900px 500px at 100% 0, rgba(16,185,129,0.06), transparent 60%),
+        #0a0e1a;
+      background-attachment: fixed;
+    }
+    * { scrollbar-width: thin; scrollbar-color: #283246 transparent; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #283246; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d4861; }
+
+    /* ── Animationen ──────────────────────────────────────────── */
+    .fade-in { animation: fadeIn .35s cubic-bezier(.16,1,.3,1); }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+    .slide-in { animation: slideIn .35s cubic-bezier(.16,1,.3,1) backwards; }
+    @keyframes slideIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+    .pulse-green { animation: pulseG 2.4s infinite; }
+    @keyframes pulseG { 0%,100% { box-shadow:0 0 0 0 rgba(16,185,129,.45); } 50% { box-shadow:0 0 0 7px rgba(16,185,129,0); } }
+
+    /* ── Icons (Lucide) ───────────────────────────────────────── */
+    [data-lucide] { width: 18px; height: 18px; stroke-width: 2; display: inline-block; vertical-align: -3px; }
+    .ico-sm [data-lucide], [data-lucide].ico-sm { width: 15px; height: 15px; }
+
+    /* ── Karten ───────────────────────────────────────────────── */
+    .card-hover { transition: transform .2s cubic-bezier(.16,1,.3,1), border-color .2s, box-shadow .2s; }
+    .card-hover:hover { transform: translateY(-3px); border-color: rgba(148,114,247,.4); box-shadow: 0 18px 40px -18px rgba(0,0,0,.75); }
+
+    /* Icon-Chip (ersetzt freistehende Emojis hübsch) */
+    .chip { display:inline-flex; align-items:center; justify-content:center; border-radius: 12px;
+            background: rgba(148,114,247,.12); color:#a78bfa; flex:none; }
+
+    /* ── Tab-Bar als Pills ────────────────────────────────────── */
+    .tab-btn { color:#9aa4b8; display:flex; align-items:center; gap:.45rem; border:1px solid transparent; }
+    .tab-btn:hover { color:#e6eaf2; background: rgba(255,255,255,.04); }
+    .tab-btn[data-active="1"], .tab-btn.bg-brand-600\/20 { color:#c8bafb; background: rgba(124,58,237,.16); border-color: rgba(124,58,237,.35); }
+
+    /* ── Formulare ────────────────────────────────────────────── */
+    input, select, textarea { transition: border-color .15s, box-shadow .15s, background .15s; }
+    input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(124,58,237,.18); }
     input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
-    .card-hover { transition: all 0.2s; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
-    /* iOS Safari: native Datums-/Zeitfelder respektieren sonst die Breite nicht
-       und ragen aus ihrer Spalte ins Nachbarfeld. */
+    /* iOS Safari: native Datums-/Zeitfelder respektieren sonst die Breite nicht. */
     input[type="date"], input[type="time"], input[type="datetime-local"] {
-      -webkit-appearance: none;
-      appearance: none;
-      min-width: 0;
-      max-width: 100%;
-      box-sizing: border-box;
+      -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; box-sizing: border-box;
     }
     input[type="date"]::-webkit-date-and-time-value { text-align: left; }
-    input[type="date"]::-webkit-calendar-picker-indicator { margin-left: 0; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.7); margin-left: 0; }
+
+    .modal-overlay { background: rgba(5,8,16,0.72); backdrop-filter: blur(8px); }
+
+    /* ── Mini-Balkendiagramm ──────────────────────────────────── */
+    .bar { background: linear-gradient(180deg, #8b5cf6, #6d28d9); border-radius: 6px 6px 2px 2px; transition: height .5s cubic-bezier(.16,1,.3,1); }
+    .bar.neg { background: linear-gradient(180deg, #fb7185, #e11d48); }
   </style>
 </head>
-<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+<body class="text-dark-100 font-sans min-h-screen">
 
   <!-- Top Navigation -->
-  <nav class="bg-dark-800/80 backdrop-blur-md border-b border-dark-700 sticky top-0 z-40">
+  <nav class="bg-dark-900/70 backdrop-blur-xl border-b border-white/5 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6">
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-lg flex items-center justify-center text-lg">🚗</div>
-          <span class="text-xl font-bold bg-gradient-to-r from-brand-400 to-accent-400 bg-clip-text text-transparent">AutoTracker</span>
-          <span class="text-xs text-dark-400 hidden sm:block">Mert & Tobias</span>
+          <div class="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-900/40">
+            <i data-lucide="car-front"></i>
+          </div>
+          <div class="leading-tight">
+            <div class="text-lg font-extrabold tracking-tight">AutoTracker</div>
+            <div class="text-[11px] text-dark-400 -mt-0.5 hidden sm:block">Mert &amp; Tobias</div>
+          </div>
         </div>
         <div class="flex items-center gap-2">
-          <div id="pot-badge" class="bg-dark-700 border border-dark-600 rounded-full px-4 py-1.5 flex items-center gap-2 cursor-pointer hover:border-accent-400 transition" onclick="showPage('pot')">
+          <div id="pot-badge" class="bg-white/5 border border-white/10 rounded-full pl-3 pr-4 py-1.5 flex items-center gap-2 cursor-pointer hover:border-accent-400/60 hover:bg-white/[.07] transition" onclick="showPage('pot')">
             <div class="w-2 h-2 rounded-full bg-accent-500 pulse-green"></div>
-            <span class="text-sm text-dark-300">Pot:</span>
+            <span class="text-xs text-dark-400 uppercase tracking-wide">Pot</span>
             <span id="nav-pot" class="text-sm font-bold text-accent-400">0,00 €</span>
           </div>
         </div>
@@ -81,13 +127,13 @@
   </nav>
 
   <!-- Tab Navigation -->
-  <div class="bg-dark-800/50 border-b border-dark-700">
+  <div class="sticky top-16 z-30 bg-dark-900/60 backdrop-blur-xl border-b border-white/5">
     <div class="max-w-7xl mx-auto px-4 sm:px-6">
-      <div class="flex gap-1 overflow-x-auto py-2">
-        <button onclick="showPage('dashboard')" data-tab="dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">📊 Dashboard</button>
-        <button onclick="showPage('cars')" data-tab="cars" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">🚗 Autos</button>
-        <button onclick="showPage('pot')" data-tab="pot" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">💰 Pot</button>
-        <button onclick="showPage('costs')" data-tab="costs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">🧾 Kosten</button>
+      <div class="flex gap-1.5 overflow-x-auto py-2.5">
+        <button onclick="showPage('dashboard')" data-tab="dashboard" class="tab-btn px-3.5 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap"><i data-lucide="layout-dashboard" class="ico-sm"></i> Dashboard</button>
+        <button onclick="showPage('cars')" data-tab="cars" class="tab-btn px-3.5 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap"><i data-lucide="car" class="ico-sm"></i> Autos</button>
+        <button onclick="showPage('pot')" data-tab="pot" class="tab-btn px-3.5 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap"><i data-lucide="wallet" class="ico-sm"></i> Pot</button>
+        <button onclick="showPage('costs')" data-tab="costs" class="tab-btn px-3.5 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap"><i data-lucide="receipt" class="ico-sm"></i> Kosten</button>
       </div>
     </div>
   </div>
@@ -97,27 +143,40 @@
 
     <!-- DASHBOARD PAGE -->
     <div id="page-dashboard" class="page fade-in">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4 card-hover">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">💰</span><span class="text-xs text-dark-400 uppercase tracking-wide">Pot-Stand</span></div>
-          <div id="stat-pot" class="text-2xl font-bold text-accent-400">0,00 €</div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+        <div class="relative overflow-hidden bg-dark-800/70 border border-white/5 rounded-2xl p-4 card-hover">
+          <div class="absolute inset-x-0 top-0 h-0.5 bg-accent-500/70"></div>
+          <div class="flex items-center gap-2 mb-2"><span class="chip w-8 h-8"><i data-lucide="wallet"></i></span><span class="text-[11px] text-dark-400 uppercase tracking-wider">Pot-Stand</span></div>
+          <div id="stat-pot" class="text-2xl font-extrabold text-accent-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4 card-hover">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">🚗</span><span class="text-xs text-dark-400 uppercase tracking-wide">Im Bestand</span></div>
-          <div id="stat-active" class="text-2xl font-bold text-brand-400">0</div>
+        <div class="relative overflow-hidden bg-dark-800/70 border border-white/5 rounded-2xl p-4 card-hover">
+          <div class="absolute inset-x-0 top-0 h-0.5 bg-brand-500/70"></div>
+          <div class="flex items-center gap-2 mb-2"><span class="chip w-8 h-8"><i data-lucide="car"></i></span><span class="text-[11px] text-dark-400 uppercase tracking-wider">Im Bestand</span></div>
+          <div id="stat-active" class="text-2xl font-extrabold text-dark-100">0</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4 card-hover">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">📈</span><span class="text-xs text-dark-400 uppercase tracking-wide">Gesamtgewinn</span></div>
-          <div id="stat-profit" class="text-2xl font-bold text-accent-400">0,00 €</div>
+        <div class="relative overflow-hidden bg-dark-800/70 border border-white/5 rounded-2xl p-4 card-hover">
+          <div class="absolute inset-x-0 top-0 h-0.5 bg-accent-500/70"></div>
+          <div class="flex items-center gap-2 mb-2"><span class="chip w-8 h-8"><i data-lucide="trending-up"></i></span><span class="text-[11px] text-dark-400 uppercase tracking-wider">Gesamtgewinn</span></div>
+          <div id="stat-profit" class="text-2xl font-extrabold text-accent-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4 card-hover">
-          <div class="flex items-center gap-2 mb-1"><span class="text-lg">⏱️</span><span class="text-xs text-dark-400 uppercase tracking-wide">Ø Standzeit</span></div>
-          <div id="stat-days" class="text-2xl font-bold text-warn-400">0 Tage</div>
+        <div class="relative overflow-hidden bg-dark-800/70 border border-white/5 rounded-2xl p-4 card-hover">
+          <div class="absolute inset-x-0 top-0 h-0.5 bg-warn-500/70"></div>
+          <div class="flex items-center gap-2 mb-2"><span class="chip w-8 h-8"><i data-lucide="timer"></i></span><span class="text-[11px] text-dark-400 uppercase tracking-wider">Ø Standzeit</span></div>
+          <div id="stat-days" class="text-2xl font-extrabold text-warn-400">0 Tage</div>
         </div>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 card-hover">
-          <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">📊 Weitere Stats</h3>
+
+      <!-- Gewinn pro Monat -->
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 mb-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2"><i data-lucide="bar-chart-3" class="ico-sm text-brand-300"></i> Gewinn pro Monat</h3>
+          <span class="text-[11px] text-dark-500 uppercase tracking-wider">verkaufte Autos</span>
+        </div>
+        <div id="profit-chart" class="flex items-end gap-2 h-40"></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-4"><i data-lucide="list" class="ico-sm text-brand-300"></i> Weitere Kennzahlen</h3>
           <div class="space-y-3">
             <div class="flex justify-between items-center"><span class="text-dark-300">Verkaufte Autos</span><span id="stat-sold" class="font-bold">0</span></div>
             <div class="flex justify-between items-center"><span class="text-dark-300">Ø Gewinn pro Auto</span><span id="stat-avg-profit" class="font-bold text-accent-400">0,00 €</span></div>
@@ -127,21 +186,21 @@
             <div class="flex justify-between items-center border-t border-dark-700 pt-3 mt-1"><span class="text-dark-200 font-medium">Netto-Gewinn <span class="text-xs text-dark-500">(nach Betriebskosten)</span></span><span id="stat-net-profit" class="font-bold text-accent-400">0,00 €</span></div>
           </div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 card-hover">
-          <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">👥 Offene Erstattungen</h3>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-4"><i data-lucide="users" class="ico-sm text-brand-300"></i> Offene Erstattungen</h3>
           <div id="dash-reimbursements" class="space-y-3"></div>
         </div>
       </div>
 
       <!-- Bestand (ohne Besichtigt) -->
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
-        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">🚗 Aktuelle Autos im Bestand</h3>
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 mb-4">
+        <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-4"><i data-lucide="car" class="ico-sm text-brand-300"></i> Aktuelle Autos im Bestand</h3>
         <div id="dash-active-cars" class="space-y-2"></div>
       </div>
 
       <!-- Besichtigte Autos -->
-      <div class="bg-dark-800 border border-dark-600 rounded-xl p-5" id="dash-visited-section">
-        <h3 class="text-sm font-semibold text-dark-400 uppercase tracking-wide mb-3">👁️ Besichtigte Autos</h3>
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5" id="dash-visited-section">
+        <h3 class="text-sm font-semibold text-dark-300 flex items-center gap-2 mb-4"><i data-lucide="eye" class="ico-sm text-dark-400"></i> Besichtigte Autos</h3>
         <div id="dash-visited-cars" class="space-y-2"></div>
       </div>
     </div>
@@ -150,34 +209,34 @@
     <div id="page-cars" class="page hidden fade-in">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 class="text-xl font-bold">Fahrzeuge</h2>
+          <h2 class="text-2xl font-extrabold tracking-tight">Fahrzeuge</h2>
           <p class="text-sm text-dark-400">Alle Autos verwalten</p>
         </div>
         <div class="flex gap-2 w-full sm:w-auto">
-          <select id="car-filter" onchange="renderCars()" class="bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm flex-1 sm:flex-none focus:outline-none focus:border-brand-500">
+          <select id="car-filter" onchange="renderCars()" class="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm flex-1 sm:flex-none focus:outline-none focus:border-brand-500">
             <option value="all">Alle</option>
-            <option value="visited">👁️ Besichtigt</option>
+            <option value="visited">Besichtigt</option>
             <option value="purchased">Gekauft</option>
             <option value="in_progress">In Aufbereitung</option>
             <option value="listed">Inseriert</option>
             <option value="sold">Verkauft</option>
           </select>
-          <button onclick="openCarModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 whitespace-nowrap">
-            <span>+</span> Neues Auto
+          <button onclick="openCarModal()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shadow-lg shadow-brand-900/30">
+            <i data-lucide="plus" class="ico-sm"></i> Neues Auto
           </button>
         </div>
       </div>
       <div id="cars-list" class="space-y-3"></div>
       <div id="cars-empty" class="hidden text-center py-16">
-        <div class="text-5xl mb-3">🚗</div>
+        <span class="chip w-16 h-16 mx-auto mb-3"><i data-lucide="car" style="width:30px;height:30px"></i></span>
         <p class="text-dark-400">Noch keine Autos vorhanden</p>
-        <button onclick="openCarModal()" class="mt-4 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition">Erstes Auto hinzufügen</button>
+        <button onclick="openCarModal()" class="mt-4 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2 rounded-xl text-sm font-semibold transition">Erstes Auto hinzufügen</button>
       </div>
     </div>
 
     <!-- CAR DETAIL PAGE -->
     <div id="page-car-detail" class="page hidden fade-in">
-      <button onclick="showPage('cars')" class="text-dark-400 hover:text-dark-100 text-sm mb-4 flex items-center gap-1 transition">← Zurück zu Autos</button>
+      <button onclick="showPage('cars')" class="text-dark-400 hover:text-dark-100 text-sm mb-4 inline-flex items-center gap-1.5 transition"><i data-lucide="arrow-left" class="ico-sm"></i> Zurück zu Autos</button>
       <div id="car-detail-content"></div>
     </div>
 
@@ -185,33 +244,33 @@
     <div id="page-pot" class="page hidden fade-in">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 class="text-xl font-bold">💰 Pot-Verwaltung</h2>
+          <h2 class="text-2xl font-extrabold tracking-tight">Pot-Verwaltung</h2>
           <p class="text-sm text-dark-400">Gemeinsame Kasse</p>
         </div>
         <div class="flex gap-2 w-full sm:w-auto">
-          <button onclick="openWithdrawModal()" class="flex-1 sm:flex-none bg-dark-700 hover:bg-dark-600 border border-dark-600 text-warn-400 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
-            <span>−</span> Entnahme
+          <button onclick="openWithdrawModal()" class="flex-1 sm:flex-none bg-white/5 hover:bg-white/10 border border-white/10 text-warn-400 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5">
+            <i data-lucide="arrow-up-from-line" class="ico-sm"></i> Entnahme
           </button>
-          <button onclick="openDepositModal()" class="flex-1 sm:flex-none bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
-            <span>+</span> Einzahlung
+          <button onclick="openDepositModal()" class="flex-1 sm:flex-none bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-accent-600/20">
+            <i data-lucide="arrow-down-to-line" class="ico-sm"></i> Einzahlung
           </button>
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Aktueller Stand</div>
           <div id="pot-balance" class="text-3xl font-bold text-accent-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Mert offen</div>
           <div id="pot-mert" class="text-2xl font-bold text-warn-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Tobias offen</div>
           <div id="pot-tobias" class="text-2xl font-bold text-warn-400">0,00 €</div>
         </div>
       </div>
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
         <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">Transaktionen</h3>
         <div id="pot-transactions" class="space-y-2"></div>
         <div id="pot-empty" class="hidden text-center py-8 text-dark-400">Keine Transaktionen vorhanden</div>
@@ -222,43 +281,43 @@
     <div id="page-costs" class="page hidden fade-in">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 class="text-xl font-bold">🧾 Allgemeine Kosten</h2>
+          <h2 class="text-2xl font-extrabold tracking-tight">Allgemeine Kosten</h2>
           <p class="text-sm text-dark-400">Betriebskosten ohne Auto-Bezug (Server, Werkzeug, Miete …)</p>
         </div>
         <div class="flex gap-2 w-full sm:w-auto">
-          <button onclick="openRecurringModal()" class="flex-1 sm:flex-none bg-dark-700 hover:bg-dark-600 border border-dark-600 text-dark-200 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 whitespace-nowrap">
-            🔁 Monatlich
+          <button onclick="openRecurringModal()" class="flex-1 sm:flex-none bg-white/5 hover:bg-white/10 border border-white/10 text-dark-200 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <i data-lucide="repeat" class="ico-sm"></i> Monatlich
           </button>
-          <button onclick="openGeneralExpenseModal()" class="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 whitespace-nowrap">
-            <span>+</span> Kosten erfassen
+          <button onclick="openGeneralExpenseModal()" class="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 whitespace-nowrap shadow-lg shadow-brand-900/30">
+            <i data-lucide="plus" class="ico-sm"></i> Kosten erfassen
           </button>
         </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Betriebskosten gesamt</div>
           <div id="costs-total" class="text-3xl font-bold text-danger-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Davon offen (privat)</div>
           <div id="costs-open" class="text-2xl font-bold text-warn-400">0,00 €</div>
         </div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 text-center">
           <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Aktive Daueraufträge</div>
           <div id="costs-recurring-count" class="text-2xl font-bold text-brand-400">0</div>
         </div>
       </div>
 
       <!-- Wiederkehrende Regeln -->
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
-        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">🔁 Monatliche Daueraufträge</h3>
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 mb-4">
+        <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-3"><i data-lucide="repeat" class="ico-sm text-brand-300"></i> Monatliche Daueraufträge</h3>
         <div id="costs-recurring" class="space-y-2"></div>
         <div id="costs-recurring-empty" class="hidden text-center py-6 text-dark-400 text-sm">Keine monatlichen Kosten eingerichtet</div>
       </div>
 
       <!-- Einzelne Buchungen -->
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
         <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">Buchungen</h3>
         <div id="costs-list" class="space-y-2"></div>
         <div id="costs-empty" class="hidden text-center py-8 text-dark-400">Noch keine Kosten erfasst</div>
@@ -281,7 +340,7 @@
         <div>
           <label class="text-xs text-dark-400 mb-1 block">Status</label>
           <select id="f-status" onchange="toggleStatusFields()" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
-            <option value="visited">👁️ Besichtigt</option>
+            <option value="visited">Besichtigt</option>
             <option value="purchased">Gekauft</option>
             <option value="in_progress">In Aufbereitung</option>
             <option value="listed">Inseriert</option>
@@ -422,7 +481,7 @@
             <option value="inserat">Inserat-Kosten</option>
             <option value="versicherung">Versicherung</option>
             <option value="steuer">Steuer</option>
-            <option value="tanken">⛽ Tanken</option>
+            <option value="tanken">Tanken</option>
             <option value="besichtigung">Besichtigungskosten</option>
             <option value="sonstiges">Sonstiges</option>
           </select>
@@ -539,7 +598,7 @@
     <div class="modal-overlay absolute inset-0" onclick="closeSellModal()"></div>
     <div class="relative z-10 max-w-md mx-auto mt-20 bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
       <div class="border-b border-dark-700 px-6 py-4 flex justify-between items-center">
-        <h2 class="text-lg font-bold">🎉 Auto verkaufen</h2>
+        <h2 class="text-lg font-bold"><i data-lucide="badge-euro" class="text-accent-400"></i> Auto verkaufen</h2>
         <button onclick="closeSellModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="sell-form" onsubmit="sellCar(event)" class="p-6 space-y-4">
@@ -558,7 +617,7 @@
     <div class="modal-overlay absolute inset-0" onclick="closeDepositModal()"></div>
     <div class="relative z-10 max-w-md mx-auto mt-20 bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
       <div class="border-b border-dark-700 px-6 py-4 flex justify-between items-center">
-        <h2 class="text-lg font-bold">💰 Einzahlung in den Pot</h2>
+        <h2 class="text-lg font-bold"><i data-lucide="arrow-down-to-line" class="text-accent-400"></i> Einzahlung in den Pot</h2>
         <button onclick="closeDepositModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="deposit-form" onsubmit="saveDeposit(event)" class="p-6 space-y-4">
@@ -581,7 +640,7 @@
     <div class="modal-overlay absolute inset-0" onclick="closeWithdrawModal()"></div>
     <div class="relative z-10 max-w-md mx-auto mt-20 bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
       <div class="border-b border-dark-700 px-6 py-4 flex justify-between items-center">
-        <h2 class="text-lg font-bold">💸 Entnahme aus dem Pot</h2>
+        <h2 class="text-lg font-bold"><i data-lucide="arrow-up-from-line" class="text-warn-400"></i> Entnahme aus dem Pot</h2>
         <button onclick="closeWithdrawModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="withdraw-form" onsubmit="saveWithdraw(event)" class="p-6 space-y-4">
@@ -604,22 +663,22 @@
     <div class="modal-overlay absolute inset-0" onclick="closeGeneralExpenseModal()"></div>
     <div class="relative z-10 max-w-lg mx-auto mt-16 max-h-[90vh] overflow-y-auto bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
       <div class="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-        <h2 class="text-lg font-bold">🧾 Allgemeine Kosten erfassen</h2>
+        <h2 class="text-lg font-bold"><i data-lucide="receipt" class="text-brand-300"></i> Allgemeine Kosten erfassen</h2>
         <button onclick="closeGeneralExpenseModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="gexp-form" onsubmit="saveGeneralExpense(event)" class="p-6 space-y-4">
         <div>
           <label class="text-xs text-dark-400 mb-1 block">Kategorie</label>
           <select id="gexp-category" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
-            <option value="server">🖥️ Server / Hosting</option>
-            <option value="software">💻 Software / Abo</option>
-            <option value="werkzeug">🔧 Werkzeug</option>
-            <option value="miete">🏠 Miete / Stellplatz</option>
-            <option value="versicherung">🛡️ Versicherung</option>
-            <option value="buero">📎 Büro / Material</option>
-            <option value="marketing">📢 Marketing / Werbung</option>
-            <option value="gebuehren">🏦 Gebühren</option>
-            <option value="sonstiges">📦 Sonstiges</option>
+            <option value="server">Server / Hosting</option>
+            <option value="software">Software / Abo</option>
+            <option value="werkzeug">Werkzeug</option>
+            <option value="miete">Miete / Stellplatz</option>
+            <option value="versicherung">Versicherung</option>
+            <option value="buero">Büro / Material</option>
+            <option value="marketing">Marketing / Werbung</option>
+            <option value="gebuehren">Gebühren</option>
+            <option value="sonstiges">Sonstiges</option>
           </select>
         </div>
         <div>
@@ -658,7 +717,7 @@
     <div class="modal-overlay absolute inset-0" onclick="closeRecurringModal()"></div>
     <div class="relative z-10 max-w-lg mx-auto mt-16 max-h-[90vh] overflow-y-auto bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
       <div class="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-        <h2 class="text-lg font-bold">🔁 Monatliche Kosten einrichten</h2>
+        <h2 class="text-lg font-bold"><i data-lucide="repeat" class="text-brand-300"></i> Monatliche Kosten einrichten</h2>
         <button onclick="closeRecurringModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
       </div>
       <form id="recurring-form" onsubmit="saveRecurring(event)" class="p-6 space-y-4">
@@ -668,15 +727,15 @@
         <div>
           <label class="text-xs text-dark-400 mb-1 block">Kategorie</label>
           <select id="rec-category" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
-            <option value="server">🖥️ Server / Hosting</option>
-            <option value="software">💻 Software / Abo</option>
-            <option value="werkzeug">🔧 Werkzeug</option>
-            <option value="miete">🏠 Miete / Stellplatz</option>
-            <option value="versicherung">🛡️ Versicherung</option>
-            <option value="buero">📎 Büro / Material</option>
-            <option value="marketing">📢 Marketing / Werbung</option>
-            <option value="gebuehren">🏦 Gebühren</option>
-            <option value="sonstiges">📦 Sonstiges</option>
+            <option value="server">Server / Hosting</option>
+            <option value="software">Software / Abo</option>
+            <option value="werkzeug">Werkzeug</option>
+            <option value="miete">Miete / Stellplatz</option>
+            <option value="versicherung">Versicherung</option>
+            <option value="buero">Büro / Material</option>
+            <option value="marketing">Marketing / Werbung</option>
+            <option value="gebuehren">Gebühren</option>
+            <option value="sonstiges">Sonstiges</option>
           </select>
         </div>
         <div>
@@ -740,10 +799,11 @@ const statusColors = {
   sold:        'bg-green-500/20 text-green-400 border-green-500/30'
 };
 const catLabels = { reparatur:'Reparatur', tuev:'TÜV/AU', zulassung:'Zulassung', aufbereitung:'Aufbereitung', transport:'Transport', inserat:'Inserat', versicherung:'Versicherung', steuer:'Steuer', tanken:'Tanken', besichtigung:'Besichtigung', sonstiges:'Sonstiges' };
-const catIcons  = { reparatur:'🔧', tuev:'📋', zulassung:'📄', aufbereitung:'✨', transport:'🚚', inserat:'📢', versicherung:'🛡️', steuer:'💼', tanken:'⛽', besichtigung:'👁️', sonstiges:'📦' };
+const _li = (n) => '<i data-lucide="' + n + '"></i>';
+const catIcons  = { reparatur:_li('wrench'), tuev:_li('clipboard-check'), zulassung:_li('file-text'), aufbereitung:_li('sparkles'), transport:_li('truck'), inserat:_li('megaphone'), versicherung:_li('shield'), steuer:_li('briefcase'), tanken:_li('fuel'), besichtigung:_li('eye'), sonstiges:_li('package') };
 // Kategorien fuer allgemeine Kosten (autofrei)
 const gexpCatLabels = { server:'Server / Hosting', software:'Software / Abo', werkzeug:'Werkzeug', miete:'Miete / Stellplatz', versicherung:'Versicherung', buero:'Büro / Material', marketing:'Marketing', gebuehren:'Gebühren', sonstiges:'Sonstiges' };
-const gexpCatIcons  = { server:'🖥️', software:'💻', werkzeug:'🔧', miete:'🏠', versicherung:'🛡️', buero:'📎', marketing:'📢', gebuehren:'🏦', sonstiges:'📦' };
+const gexpCatIcons  = { server:_li('server'), software:_li('laptop'), werkzeug:_li('wrench'), miete:_li('house'), versicherung:_li('shield'), buero:_li('paperclip'), marketing:_li('megaphone'), gebuehren:_li('landmark'), sonstiges:_li('package') };
 const partnerName = (id) => id === 'mert' ? 'Mert' : id === 'tobias' ? 'Tobias' : (id || '');
 
 function showToast(msg, icon = '✅') {
@@ -752,6 +812,46 @@ function showToast(msg, icon = '✅') {
   document.getElementById('toast-icon').textContent = icon;
   t.classList.remove('hidden');
   setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+// Lucide-Icons (auch nach dynamischem innerHTML) rendern
+function refreshIcons() { if (window.lucide) { try { lucide.createIcons(); } catch (e) {} } }
+let _iconScheduled = false;
+
+// Balkendiagramm: Gewinn der letzten 6 Monate (aus verkauften Autos)
+function renderProfitChart(cars) {
+  const el = document.getElementById('profit-chart');
+  if (!el) return;
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
+      label: d.toLocaleDateString('de-DE', { month: 'short' }),
+      profit: 0
+    });
+  }
+  (cars || []).filter(c => c.status === 'sold' && c.saleDate).forEach(c => {
+    const d = new Date(c.saleDate);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const m = months.find(x => x.key === key);
+    if (m) {
+      const costs = (c.purchasePrice || 0) + (c.expenses || []).reduce((s, e) => s + e.amount, 0);
+      m.profit += (c.actualSellPrice || 0) - costs;
+    }
+  });
+  const max = Math.max(1, ...months.map(m => Math.abs(m.profit)));
+  el.innerHTML = months.map(m => {
+    const h   = Math.max(2, Math.round(Math.abs(m.profit) / max * 88));
+    const neg = m.profit < 0;
+    const val = m.profit ? (neg ? '−' : '') + Math.round(Math.abs(m.profit)).toLocaleString('de-DE') : '';
+    return `<div class="flex-1 flex flex-col items-center justify-end h-full gap-1" title="${m.label}: ${fmt(m.profit)}">
+      <div class="text-[10px] font-semibold ${neg ? 'text-danger-400' : 'text-accent-400'}">${val}</div>
+      <div class="bar ${neg ? 'neg' : ''} w-full max-w-[44px]" style="height:${h}%"></div>
+      <div class="text-[11px] text-dark-400 mt-1">${m.label}</div>
+    </div>`;
+  }).join('');
 }
 
 function showPage(page) {
@@ -809,7 +909,7 @@ async function loadDashboard() {
     : active.map(c => {
         const totalCost = (c.purchasePrice || 0) + (c.expenses || []).reduce((s,e) => s+e.amount, 0);
         return `<div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 cursor-pointer hover:bg-dark-700 transition" onclick="currentCarId='${c.id}';showPage('car-detail')">
-          <div class="flex items-center gap-3"><span class="text-xl">🚗</span>
+          <div class="flex items-center gap-3"><span class="chip w-9 h-9"><i data-lucide="car"></i></span>
             <div><div class="font-medium">${c.brand} ${c.model}</div>
             <div class="text-xs text-dark-400">${c.year||''} · ${c.mileage?c.mileage.toLocaleString('de-DE')+' km':''}</div></div>
           </div>
@@ -829,7 +929,7 @@ async function loadDashboard() {
     visitedDiv.innerHTML = visited.map(c => {
       const totalExp = (c.expenses || []).reduce((s,e) => s+e.amount, 0);
       return `<div class="flex items-center justify-between bg-dark-700/30 rounded-lg px-4 py-3 cursor-pointer hover:bg-dark-700/50 transition" onclick="currentCarId='${c.id}';showPage('car-detail')">
-        <div class="flex items-center gap-3"><span class="text-xl">👁️</span>
+        <div class="flex items-center gap-3"><span class="chip w-9 h-9 !bg-dark-600/40 !text-dark-300"><i data-lucide="eye"></i></span>
           <div><div class="font-medium text-dark-300">${c.brand} ${c.model}</div>
           <div class="text-xs text-dark-500">${c.year||''} · ${c.mileage?c.mileage.toLocaleString('de-DE')+' km':''}</div></div>
         </div>
@@ -839,6 +939,8 @@ async function loadDashboard() {
         </div></div>`;
     }).join('');
   }
+
+  renderProfitChart(cars);
 }
 
 // ── CARS LIST ──────────────────────────────────────────────
@@ -868,14 +970,14 @@ function renderCars() {
     return `<div class="bg-dark-800 border ${isVisited ? 'border-dark-600 opacity-80' : 'border-dark-700'} rounded-xl p-4 card-hover cursor-pointer slide-in" onclick="currentCarId='${c.id}';showPage('car-detail')">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 bg-gradient-to-br ${isVisited ? 'from-slate-600/30 to-slate-800/30' : 'from-brand-600/30 to-brand-800/30'} rounded-xl flex items-center justify-center text-2xl">${isVisited ? '👁️' : '🚗'}</div>
+          <div class="w-12 h-12 bg-gradient-to-br ${isVisited ? 'from-dark-600/40 to-dark-700/40 text-dark-300' : 'from-brand-600/30 to-brand-800/30 text-brand-200'} rounded-xl flex items-center justify-center">${isVisited ? '<i data-lucide="eye" style="width:22px;height:22px"></i>' : '<i data-lucide="car" style="width:22px;height:22px"></i>'}</div>
           <div>
             <div class="font-bold text-lg">${c.brand} ${c.model}</div>
             <div class="text-sm text-dark-400 flex flex-wrap gap-x-3 gap-y-0.5">
-              ${c.year?'<span>📅 '+c.year+'</span>':''}
-              ${c.mileage?'<span>🛣️ '+c.mileage.toLocaleString('de-DE')+' km</span>':''}
-              ${c.horsepower?'<span>⚡ '+c.horsepower+' PS</span>':''}
-              ${c.fuel?'<span>⛽ '+c.fuel+'</span>':''}
+              ${c.year?'<span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="ico-sm"></i>'+c.year+'</span>':''}
+              ${c.mileage?'<span class="inline-flex items-center gap-1"><i data-lucide="gauge" class="ico-sm"></i>'+c.mileage.toLocaleString('de-DE')+' km</span>':''}
+              ${c.horsepower?'<span class="inline-flex items-center gap-1"><i data-lucide="zap" class="ico-sm"></i>'+c.horsepower+' PS</span>':''}
+              ${c.fuel?'<span class="inline-flex items-center gap-1"><i data-lucide="fuel" class="ico-sm"></i>'+c.fuel+'</span>':''}
             </div>
           </div>
         </div>
@@ -910,31 +1012,33 @@ async function loadCarDetail(id) {
   document.getElementById('car-detail-content').innerHTML = `
     <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-2xl font-bold flex items-center gap-3">${isVisited?'👁️':'🚗'} ${car.brand} ${car.model}
+        <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2.5">
+          <span class="chip w-9 h-9 ${isVisited?'!bg-dark-600/40 !text-dark-300':''}"><i data-lucide="${isVisited?'eye':'car'}"></i></span>
+          ${car.brand} ${car.model}
           <span class="px-3 py-1 rounded-full text-xs border ${statusColors[car.status]}">${statusLabels[car.status]}</span>
         </h1>
         <p class="text-dark-400 mt-1">${[car.year,car.color,car.fuel,car.transmission,car.horsepower?car.horsepower+' PS':''].filter(Boolean).join(' · ')}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        ${isVisited ? `<button onclick="upgradeToKauf('${car.id}')" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-3 py-2 rounded-lg transition">🚗 Als gekauft markieren</button>` : ''}
-        <button onclick="openExpenseModal('${car.id}')" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-2 rounded-lg transition">+ Ausgabe</button>
-        <button onclick="openEditCarModal('${car.id}')" class="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-2 rounded-lg transition">✏️ Bearbeiten</button>
-        ${!isVisited && car.status !== 'sold' ? `<button onclick="openSellModal('${car.id}')" class="bg-accent-500 hover:bg-accent-600 text-white text-sm px-3 py-2 rounded-lg transition">💰 Verkaufen</button>` : ''}
-        <button onclick="deleteCar('${car.id}')" class="bg-danger-500/20 hover:bg-danger-500/30 text-danger-400 border border-danger-500/30 text-sm px-3 py-2 rounded-lg transition">🗑️</button>
+        ${isVisited ? `<button onclick="upgradeToKauf('${car.id}')" class="bg-brand-600 hover:bg-brand-500 text-white text-sm px-3 py-2 rounded-xl transition inline-flex items-center gap-1.5"><i data-lucide="check" class="ico-sm"></i> Als gekauft</button>` : ''}
+        <button onclick="openExpenseModal('${car.id}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-sm px-3 py-2 rounded-xl transition inline-flex items-center gap-1.5"><i data-lucide="plus" class="ico-sm"></i> Ausgabe</button>
+        <button onclick="openEditCarModal('${car.id}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-sm px-3 py-2 rounded-xl transition inline-flex items-center gap-1.5"><i data-lucide="pencil" class="ico-sm"></i> Bearbeiten</button>
+        ${!isVisited && car.status !== 'sold' ? `<button onclick="openSellModal('${car.id}')" class="bg-accent-500 hover:bg-accent-600 text-white text-sm px-3 py-2 rounded-xl transition inline-flex items-center gap-1.5"><i data-lucide="badge-euro" class="ico-sm"></i> Verkaufen</button>` : ''}
+        <button onclick="deleteCar('${car.id}')" class="bg-danger-500/15 hover:bg-danger-500/25 text-danger-400 border border-danger-500/30 text-sm px-3 py-2 rounded-xl transition inline-flex items-center"><i data-lucide="trash-2" class="ico-sm"></i></button>
       </div>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       ${isVisited ? `
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Inserierter Preis</div><div class="text-xl font-bold">${car.listedBuyPrice?fmt(car.listedBuyPrice):'–'}</div></div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Kosten bisher</div><div class="text-xl font-bold text-warn-400">${fmt(totalExp)}</div><div class="text-xs text-dark-400">${(car.expenses||[]).length} Posten</div></div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Zielkaufpreis</div><div class="text-xl font-bold">${car.purchasePrice?fmt(car.purchasePrice):'–'}</div></div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Zielverkaufspreis</div><div class="text-xl font-bold">${car.targetSellPrice?fmt(car.targetSellPrice):'–'}</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Inserierter Preis</div><div class="text-xl font-bold">${car.listedBuyPrice?fmt(car.listedBuyPrice):'–'}</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Kosten bisher</div><div class="text-xl font-bold text-warn-400">${fmt(totalExp)}</div><div class="text-xs text-dark-400">${(car.expenses||[]).length} Posten</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Zielkaufpreis</div><div class="text-xl font-bold">${car.purchasePrice?fmt(car.purchasePrice):'–'}</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Zielverkaufspreis</div><div class="text-xl font-bold">${car.targetSellPrice?fmt(car.targetSellPrice):'–'}</div></div>
       ` : `
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Kaufpreis</div><div class="text-xl font-bold">${fmt(car.purchasePrice)}</div>${car.listedBuyPrice?'<div class="text-xs text-dark-400">Inseriert: '+fmt(car.listedBuyPrice)+'</div>':''}</div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Ausgaben</div><div class="text-xl font-bold text-warn-400">${fmt(totalExp)}</div><div class="text-xs text-dark-400">${(car.expenses||[]).length} Posten</div></div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4"><div class="text-xs text-dark-400">Gesamt investiert</div><div class="text-xl font-bold text-brand-400">${fmt(totalCost)}</div></div>
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Kaufpreis</div><div class="text-xl font-bold">${fmt(car.purchasePrice)}</div>${car.listedBuyPrice?'<div class="text-xs text-dark-400">Inseriert: '+fmt(car.listedBuyPrice)+'</div>':''}</div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Ausgaben</div><div class="text-xl font-bold text-warn-400">${fmt(totalExp)}</div><div class="text-xs text-dark-400">${(car.expenses||[]).length} Posten</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4"><div class="text-xs text-dark-400">Gesamt investiert</div><div class="text-xl font-bold text-brand-400">${fmt(totalCost)}</div></div>
+        <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-4">
           <div class="text-xs text-dark-400">${car.status==='sold'?'Gewinn/Verlust':'Zielverkaufspreis'}</div>
           ${car.status==='sold'
             ? `<div class="text-xl font-bold ${profit>=0?'text-accent-400':'text-danger-400'}">${profit>=0?'+':''}${fmt(profit)}</div><div class="text-xs text-dark-400">Verkauft: ${fmt(car.actualSellPrice)}</div>`
@@ -944,17 +1048,17 @@ async function loadCarDetail(id) {
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
-        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">📋 Details</h3>
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
+        <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-3"><i data-lucide="clipboard-list" class="ico-sm text-brand-300"></i> Details</h3>
         <div class="space-y-2 text-sm">
           <div class="flex justify-between"><span class="text-dark-400">FIN</span><span class="font-mono">${car.vin||'–'}</span></div>
           <div class="flex justify-between"><span class="text-dark-400">Kilometerstand</span><span>${car.mileage?car.mileage.toLocaleString('de-DE')+' km':'–'}</span></div>
           ${(car.previousOwners!==null && car.previousOwners!==undefined && car.previousOwners!=='')?'<div class="flex justify-between"><span class="text-dark-400">Vorbesitzer</span><span>'+car.previousOwners+'</span></div>':''}
-          ${car.serviceHistory?'<div class="flex justify-between"><span class="text-dark-400">Scheckheft</span><span>'+(car.serviceHistory==='ja'?'✅ gepflegt':'❌ nein')+'</span></div>':''}
+          ${car.serviceHistory?'<div class="flex justify-between"><span class="text-dark-400">Scheckheft</span><span>'+(car.serviceHistory==='ja'?'<span class="text-accent-400">Ja, gepflegt</span>':'<span class="text-danger-400">Nein</span>')+'</span></div>':''}
           ${(car.lastServiceDate||car.lastServiceKm)?'<div class="flex justify-between"><span class="text-dark-400">Letzter Service</span><span>'+[car.lastServiceDate?fmtDate(car.lastServiceDate):null,car.lastServiceKm?car.lastServiceKm.toLocaleString('de-DE')+' km':null].filter(Boolean).join(' · ')+'</span></div>':''}
           <div class="flex justify-between"><span class="text-dark-400">Kaufdatum</span><span>${fmtDate(car.purchaseDate)}</span></div>
           ${car.saleDate?'<div class="flex justify-between"><span class="text-dark-400">Verkaufsdatum</span><span>'+fmtDate(car.saleDate)+'</span></div>':''}
-          ${!isVisited?'<div class="flex justify-between"><span class="text-dark-400">Bezahlung</span><span>'+(car.purchaseFunding==='pot'?'💰 Pot':'👤 Privat ('+(car.purchasePaidBy||'')+')') +'</span></div>':''}
+          ${!isVisited?'<div class="flex justify-between"><span class="text-dark-400">Bezahlung</span><span>'+(car.purchaseFunding==='pot'?'Pot':'Privat ('+(car.purchasePaidBy||'')+')') +'</span></div>':''}
           <div class="flex justify-between"><span class="text-dark-400">Plattform</span><span>${car.sourcePlatform||'–'}</span></div>
           ${car.sourceLink?'<div class="flex justify-between"><span class="text-dark-400">Inserat</span><a href="'+car.sourceLink+'" target="_blank" class="text-brand-400 hover:underline truncate max-w-[200px]">Link →</a></div>':''}
           ${car.sellerName?'<div class="flex justify-between"><span class="text-dark-400">Verkäufer</span><span>'+car.sellerName+'</span></div>':''}
@@ -963,9 +1067,9 @@ async function loadCarDetail(id) {
         ${car.notes?'<div class="mt-3 p-3 bg-dark-700/50 rounded-lg text-sm text-dark-300">'+car.notes+'</div>':''}
       </div>
 
-      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
+      <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">💸 Ausgaben</h3>
+          <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2"><i data-lucide="banknote" class="ico-sm text-brand-300"></i> Ausgaben</h3>
           <button onclick="openExpenseModal('${car.id}')" class="text-xs bg-dark-700 hover:bg-dark-600 px-2 py-1 rounded-lg transition">+ Neu</button>
         </div>
         <div class="space-y-2 max-h-64 overflow-y-auto">
@@ -973,7 +1077,7 @@ async function loadCarDetail(id) {
             : (car.expenses||[]).map(e=>`
               <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-3 py-2 group">
                 <div class="flex items-center gap-2">
-                  <span>${catIcons[e.category]||'📦'}</span>
+                  <span>${catIcons[e.category]||_li('package')}</span>
                   <div><div class="text-sm font-medium">${catLabels[e.category]||e.category}</div>
                   <div class="text-xs text-dark-400">${fmtDate(e.date)} · ${e.fundingSource==='pot'?'Pot':e.paidBy}${e.note?' · '+e.note:''}</div></div>
                 </div>
@@ -988,16 +1092,16 @@ async function loadCarDetail(id) {
       </div>
     </div>
 
-    <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
+    <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5 mb-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide">📎 Fotos & Dokumente</h3>
+        <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2"><i data-lucide="paperclip" class="ico-sm text-brand-300"></i> Fotos &amp; Dokumente</h3>
         <div class="flex gap-2">
           <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
-            📷 Foto
+            <i data-lucide="camera" class="ico-sm"></i> Foto
             <input type="file" accept="image/*" multiple class="hidden" onchange="uploadDateien(event, '${car.id}', 'photo')">
           </label>
           <label class="cursor-pointer bg-dark-700 hover:bg-dark-600 border border-dark-600 text-sm px-3 py-1.5 rounded-lg transition">
-            📄 PDF
+            <i data-lucide="file-text" class="ico-sm"></i> PDF
             <input type="file" accept="application/pdf" multiple class="hidden" onchange="uploadDateien(event, '${car.id}', 'pdf')">
           </label>
         </div>
@@ -1016,7 +1120,7 @@ async function loadCarDetail(id) {
 
     <div id="pdf-viewer" class="fixed inset-0 z-50 hidden flex-col bg-dark-900">
       <div class="flex items-center justify-between px-4 py-3 bg-dark-800 border-b border-dark-700">
-        <span class="text-sm font-medium">📄 PDF Dokument</span>
+        <span class="text-sm font-medium"><i data-lucide="file-text" class="ico-sm"></i> PDF Dokument</span>
         <div class="flex items-center gap-4">
           <a id="pdf-open-tab" href="#" target="_blank" rel="noopener" class="text-brand-400 hover:text-brand-300 text-sm">↗ Neuer Tab</a>
           <button onclick="closePDF()" class="text-dark-400 hover:text-white text-xl px-2">✕ Schließen</button>
@@ -1025,8 +1129,8 @@ async function loadCarDetail(id) {
       <div id="pdf-pages" class="flex-1 w-full overflow-y-auto p-3 sm:p-4"></div>
     </div>
 
-    <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
-      <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">📜 Status-Verlauf</h3>
+    <div class="bg-dark-800/70 border border-white/5 rounded-2xl p-5">
+      <h3 class="text-sm font-semibold text-dark-200 flex items-center gap-2 mb-3"><i data-lucide="history" class="ico-sm text-brand-300"></i> Status-Verlauf</h3>
       <div class="space-y-2">
         ${(car.statusHistory||[]).map((h,i)=>`
           <div class="flex items-center gap-3">
@@ -1046,7 +1150,7 @@ function renderDateien(car) {
   const pdfs     = allFiles.filter(function(u) { return u.includes('|pdf|') || u.slice(-4).toLowerCase() === '.pdf'; });
 
   if (photos.length === 0 && pdfs.length === 0) {
-    return '<div class="text-center py-8 border-2 border-dashed border-dark-600 rounded-xl"><div class="text-3xl mb-2">📎</div><p class="text-dark-400 text-sm">Noch keine Dateien vorhanden</p></div>';
+    return '<div class="text-center py-8 border-2 border-dashed border-dark-600 rounded-xl"><div class="mb-2 flex justify-center"><i data-lucide="folder-open" style="width:30px;height:30px" class="text-dark-500"></i></div><p class="text-dark-400 text-sm">Noch keine Dateien vorhanden</p></div>';
   }
 
   var html = '';
@@ -1072,11 +1176,11 @@ function renderDateien(car) {
       var rawUrl = isPipe ? entry.split('|pdf|')[1] : entry;
       var namePart = isPipe ? entry.split('|pdf|')[0] : rawUrl.split('/').pop().split('.')[0];
       html += '<div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">';
-      html += '<div class="flex items-center gap-3"><span class="text-2xl">📄</span>';
+      html += '<div class="flex items-center gap-3"><span class="chip w-9 h-9"><i data-lucide="file-text"></i></span>';
       html += '<div><div class="text-sm font-medium">' + namePart + '</div><div class="text-xs text-dark-400">PDF Dokument</div></div></div>';
       html += '<div class="flex items-center gap-2">';
       html += '<button data-pdfurl="' + API + rawUrl + '" onclick="openPDF(this.dataset.pdfurl)" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg transition">Öffnen</button>';
-      html += '<button data-carid="' + car.id + '" data-url="' + j + '" onclick="deleteFileByIndex(this, true)" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm ml-1">🗑️</button>';
+      html += '<button data-carid="' + car.id + '" data-url="' + j + '" onclick="deleteFileByIndex(this, true)" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm ml-1"><i data-lucide="trash-2" class="ico-sm"></i></button>';
       html += '</div></div>';
     }
     html += '</div>';
@@ -1671,7 +1775,7 @@ async function loadPot() {
     const titel = isW ? 'Entnahme – ' + who : 'Einzahlung von ' + who;
     return `
     <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">
-      <div class="flex items-center gap-3"><span class="text-lg">${isW ? '💸' : '💰'}</span>
+      <div class="flex items-center gap-3"><span class="chip w-9 h-9 ${isW ? '!bg-warn-400/10 !text-warn-400' : '!bg-accent-500/10 !text-accent-400'}">${isW ? '<i data-lucide="arrow-up-right"></i>' : '<i data-lucide="arrow-down-left"></i>'}</span>
         <div>
           <div class="text-sm font-medium">${titel}</div>
           <div class="text-xs text-dark-400">${fmtDate(t.date)}${t.note?' · '+t.note:''}</div>
@@ -1765,11 +1869,11 @@ async function loadCosts() {
     recDiv.innerHTML = recurring.map(r => `
       <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group ${r.active ? '' : 'opacity-50'}">
         <div class="flex items-center gap-3">
-          <span class="text-lg">${gexpCatIcons[r.category] || '📦'}</span>
+          <span class="text-lg">${gexpCatIcons[r.category] || _li('package')}</span>
           <div>
             <div class="text-sm font-medium">${gexpCatLabels[r.category] || r.category}${r.note ? ' · ' + r.note : ''}</div>
             <div class="text-xs text-dark-400">
-              jeden ${r.day_of_month}. · ${r.funding_source === 'pot' ? '💰 Pot' : '👤 ' + partnerName(r.paid_by)}
+              jeden ${r.day_of_month}. · ${r.funding_source === 'pot' ? 'Pot' : '' + partnerName(r.paid_by)}
               ${r.active ? '' : ' · <span class="text-danger-400">gestoppt</span>'}
             </div>
           </div>
@@ -1777,7 +1881,7 @@ async function loadCosts() {
         <div class="flex items-center gap-2">
           <span class="font-bold text-sm">${fmt(r.amount)}/Mon.</span>
           ${r.active ? `<button onclick="stopRecurring('${r.id}')" class="text-xs bg-warn-400/20 text-warn-400 px-2 py-0.5 rounded hover:bg-warn-400/30 transition">Stoppen</button>` : ''}
-          <button onclick="deleteRecurring('${r.id}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm">🗑️</button>
+          <button onclick="deleteRecurring('${r.id}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm"><i data-lucide="trash-2" class="ico-sm"></i></button>
         </div>
       </div>`).join('');
   }
@@ -1792,10 +1896,10 @@ async function loadCosts() {
   list.innerHTML = expenses.map(e => `
     <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">
       <div class="flex items-center gap-3">
-        <span class="text-lg">${gexpCatIcons[e.category] || '📦'}</span>
+        <span class="text-lg">${gexpCatIcons[e.category] || _li('package')}</span>
         <div>
-          <div class="text-sm font-medium">${gexpCatLabels[e.category] || e.category}${e.auto_generated ? ' <span class="text-xs text-brand-400">🔁 auto</span>' : ''}</div>
-          <div class="text-xs text-dark-400">${fmtDate(e.date)} · ${e.funding_source === 'pot' ? 'Pot' : '👤 ' + partnerName(e.paid_by)}${e.note ? ' · ' + e.note : ''}</div>
+          <div class="text-sm font-medium">${gexpCatLabels[e.category] || e.category}${e.auto_generated ? ' <span class="text-xs text-brand-400"><i data-lucide="repeat" class="ico-sm"></i> auto</span>' : ''}</div>
+          <div class="text-xs text-dark-400">${fmtDate(e.date)} · ${e.funding_source === 'pot' ? 'Pot' : '' + partnerName(e.paid_by)}${e.note ? ' · ' + e.note : ''}</div>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -1902,6 +2006,14 @@ async function deleteRecurring(id) {
   }
   loadCosts();
 }
+
+// Icons initial rendern + bei jeder dynamischen DOM-Aenderung nachziehen
+refreshIcons();
+new MutationObserver(() => {
+  if (_iconScheduled) return;
+  _iconScheduled = true;
+  requestAnimationFrame(() => { _iconScheduled = false; refreshIcons(); });
+}).observe(document.body, { childList: true, subtree: true });
 
 showPage('dashboard');
 </script>
