@@ -1,0 +1,20 @@
+services:
+  autotracker:
+    build: .
+    container_name: autotracker
+    restart: unless-stopped
+    # Host-Port 3000 ist auf diesem Server frei (Autoscanner läuft auf 5000/5001,
+    # flaresolverr auf 8191, nginx auf 80/443). Nur lokal binden – nach außen
+    # geht ohnehin nur über den nginx-Reverse-Proxy.
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - PORT=3000
+      - DATA_DIR=/app/data
+      # App-Passwort (Login) + Cookie-Secret kommen aus der .env-Datei
+      # (NICHT im Git, siehe .gitignore). Beispiel in .env.example.
+      - APP_PASSWORD=${APP_PASSWORD:-changeme}
+      - AUTH_SECRET=${AUTH_SECRET:-dev-only-insecure-secret-change-me}
+    volumes:
+      # SQLite-DB UND Uploads liegen in ./data und bleiben so erhalten
+      - ./data:/app/data

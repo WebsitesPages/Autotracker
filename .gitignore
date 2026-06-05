@@ -1,0 +1,15 @@
+# Abhaengigkeiten
+node_modules/
+
+# Laufzeitdaten: SQLite-DB, WAL, Uploads, alter JSON-Store
+data/
+
+# Geheimnisse
+.env
+
+# Migrations-Exporte mit personenbezogenen Daten (einmalig, lokal)
+cars.csv
+pot.csv
+
+# Logs
+*.log

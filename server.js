@@ -1,20 +1,90 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const crypto = require('crypto');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Supabase Client – Keys kommen aus Umgebungsvariablen!
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+// Datenbank-Schema sicherstellen
+db.initSchema();
+
+// Upload-Verzeichnis (lokal statt Supabase Storage)
+const UPLOADS_DIR = path.join(db.DATA_DIR, 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// ─── EINFACHER PASSWORT-LOGIN ────────────────────────────────────────────────
+// Ein gemeinsames Passwort. Bei Erfolg setzt der Server ein langlebiges,
+// HttpOnly-Cookie (1 Jahr) -> auf dem iPhone-Homescreen-WebApp bleibt man
+// angemeldet, auch nach Schliessen der App. Erneute Eingabe nur, wenn das
+// Cookie fehlt/ablaeuft.
+// Echte Werte kommen via docker-compose aus der (gitignorierten) .env.
+// Die Defaults sind nur harmlose Platzhalter, damit nichts Geheimes im Repo liegt.
+const APP_PASSWORD   = process.env.APP_PASSWORD || 'changeme';
+const AUTH_SECRET    = process.env.AUTH_SECRET  || 'dev-only-insecure-secret-change-me';
+const COOKIE_NAME    = 'at_auth';
+const COOKIE_PATH    = '/tracker'; // App laeuft unter autoscanner.space/tracker
+const COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000; // 1 Jahr
+// Cookie-Wert = HMAC des Passworts. Ohne AUTH_SECRET nicht faelschbar.
+const AUTH_TOKEN = crypto.createHash('sha256').update(APP_PASSWORD + '|' + AUTH_SECRET).digest('hex');
+
+function parseCookies(header) {
+  const out = {};
+  (header || '').split(';').forEach(part => {
+    const i = part.indexOf('=');
+    if (i > -1) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  });
+  return out;
+}
+function isAuthed(req) {
+  return parseCookies(req.headers.cookie)[COOKIE_NAME] === AUTH_TOKEN;
+}
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// 50mb: PDFs werden (anders als Bilder) ungekuerzt als Base64 geschickt.
+// Muss zum client_max_body_size in der nginx-Config passen.
+app.use(express.json({ limit: '50mb' }));
+// Zu grosse Uploads sauber als JSON melden (statt HTML-Fehlerseite)
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Datei zu groß (max. ~50 MB).' });
+  }
+  next(err);
+});
+
+// Login: Passwort pruefen, bei Erfolg langlebiges Cookie setzen.
+// (Steht VOR dem Gate, damit es ohne Anmeldung erreichbar ist.)
+app.post('/api/login', async (req, res) => {
+  const pw = (req.body && req.body.password) || '';
+  if (pw === APP_PASSWORD) {
+    res.cookie(COOKIE_NAME, AUTH_TOKEN, {
+      httpOnly: true, secure: true, sameSite: 'lax',
+      maxAge: COOKIE_MAX_AGE, path: COOKIE_PATH
+    });
+    return res.json({ success: true });
+  }
+  await new Promise(r => setTimeout(r, 600)); // kleiner Bremsklotz gegen Brute-Force
+  res.status(401).json({ error: 'Falsches Passwort' });
+});
+
+app.post('/api/logout', (req, res) => {
+  res.clearCookie(COOKIE_NAME, { path: COOKIE_PATH });
+  res.json({ success: true });
+});
+
+// Auth-Gate: ab hier ist alles geschuetzt.
+app.use((req, res, next) => {
+  if (isAuthed(req)) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Nicht angemeldet' });
+  // Jede Seiten-/Datei-Anfrage ohne Login -> Login-Seite ausliefern
+  return res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
+// Hochgeladene Dateien statisch ausliefern (URLs sehen aus wie /uploads/<carId>/<datei>)
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // ─── HELPER ────────────────────────────────────────────────────────────────
 
@@ -22,7 +92,7 @@ function round2(n) {
   return Math.round((n || 0) * 100) / 100;
 }
 
-async function getPartners() {
+function getPartners() {
   // Partner sind fix: Mert & Tobias – wir berechnen Erstattungen dynamisch
   return [
     { id: 'mert', name: 'Mert', openReimbursement: 0 },
@@ -30,15 +100,76 @@ async function getPartners() {
   ];
 }
 
-async function recalculate() {
-  const { data: cars } = await supabase.from('cars').select('*');
-  const { data: potTransactions } = await supabase.from('pot_transactions').select('*');
+// Wiederkehrende Kosten materialisieren: erzeugt fuer jede aktive Regel die
+// fehlenden Monatsbuchungen vom zuletzt gebuchten Monat (last_period) bis zum
+// aktuellen Monat. Idempotent & selbstheilend (holt auch nach, falls der Server
+// laenger aus war). Das Wasserzeichen last_period verhindert, dass eine vom User
+// geloeschte Monatsbuchung beim naechsten Aufruf wieder auftaucht.
+function materializeRecurring() {
+  const rules = db.getRecurringExpensesActive();
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curM = now.getMonth(); // 0-basiert
 
-  const partners = await getPartners();
+  for (const rule of rules) {
+    const start = new Date((rule.start_date || '') + 'T00:00:00');
+    if (isNaN(start.getTime())) continue;
+
+    // Startmonat bestimmen: ab last_period+1, sonst ab Startdatum
+    let y, m;
+    if (rule.last_period) {
+      const [ly, lm] = rule.last_period.split('-').map(Number);
+      y = ly; m = lm; // lm ist 1-basiert -> entspricht 0-basiert dem Folgemonat
+      if (m > 11) { m = 0; y++; }
+    } else {
+      y = start.getFullYear(); m = start.getMonth();
+    }
+
+    let lastPeriod = rule.last_period;
+    const day = Math.min(Math.max(rule.day_of_month || 1, 1), 28);
+
+    while (y < curY || (y === curY && m <= curM)) {
+      const period = `${y}-${String(m + 1).padStart(2, '0')}`;
+      const dateStr = `${period}-${String(day).padStart(2, '0')}`;
+      db.insertGeneralExpense({
+        id: 'gexp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        category: rule.category,
+        amount: rule.amount,
+        funding_source: rule.funding_source,
+        paid_by: rule.paid_by,
+        reimbursed: 0,
+        reimbursed_date: null,
+        date: dateStr,
+        note: rule.note,
+        recurring_id: rule.id,
+        auto_generated: 1,
+        period,
+        created_at: new Date().toISOString()
+      });
+      lastPeriod = period;
+      m++; if (m > 11) { m = 0; y++; }
+    }
+
+    if (lastPeriod && lastPeriod !== rule.last_period) {
+      db.updateRecurringExpense(rule.id, { last_period: lastPeriod });
+    }
+  }
+}
+
+function recalculate() {
+  // Faellige wiederkehrende Kosten zuerst buchen, damit sie hier mitzaehlen
+  materializeRecurring();
+
+  const cars = db.getCars();
+  const potTransactions = db.getPotTransactions();
+  const generalExpenses = db.getGeneralExpenses();
+
+  const partners = getPartners();
 
   let potBalance = 0;
   (potTransactions || []).forEach(t => {
     if (t.type === 'deposit') potBalance += t.amount;
+    else if (t.type === 'withdrawal') potBalance -= t.amount;
   });
 
   let totalRevenue = 0, totalInvested = 0;
@@ -85,10 +216,29 @@ async function recalculate() {
     }
   });
 
+  // Allgemeine Kosten (Server, Werkzeug ...): gleicher Geldfluss wie Auto-Ausgaben
+  let totalOverhead = 0;
+  (generalExpenses || []).forEach(g => {
+    totalOverhead += g.amount || 0;
+    if (g.funding_source === 'pot') {
+      potBalance -= g.amount;
+    } else if (g.funding_source === 'private') {
+      const partner = partners.find(p => p.id === g.paid_by);
+      if (partner) {
+        if (!g.reimbursed) {
+          partner.openReimbursement += g.amount;
+        } else {
+          potBalance -= g.amount;
+        }
+      }
+    }
+  });
+
   return {
     potBalance: round2(potBalance),
     totalInvested: round2(totalInvested),
     totalRevenue: round2(totalRevenue),
+    totalOverhead: round2(totalOverhead),
     partners,
     cars: cars || []
   };
@@ -125,6 +275,10 @@ function dbCarToFrontend(car) {
     buyerContact: car.buyer_contact,
     status: car.status,
     notes: car.notes,
+    previousOwners: car.previous_owners,
+    serviceHistory: car.service_history,
+    lastServiceDate: car.last_service_date,
+    lastServiceKm: car.last_service_km,
     expenses: car.expenses || [],
     statusHistory: car.status_history || [],
     photos: car.photos || [],
@@ -162,6 +316,10 @@ function frontendCarToDB(data) {
   if (data.buyerContact !== undefined) row.buyer_contact = data.buyerContact;
   if (data.status !== undefined) row.status = data.status;
   if (data.notes !== undefined) row.notes = data.notes;
+  if (data.previousOwners !== undefined) row.previous_owners = data.previousOwners;
+  if (data.serviceHistory !== undefined) row.service_history = data.serviceHistory;
+  if (data.lastServiceDate !== undefined) row.last_service_date = data.lastServiceDate || null;
+  if (data.lastServiceKm !== undefined) row.last_service_km = data.lastServiceKm;
   if (data.expenses !== undefined) row.expenses = data.expenses;
   if (data.statusHistory !== undefined) row.status_history = data.statusHistory;
   if (data.photos !== undefined) row.photos = data.photos;
@@ -170,22 +328,25 @@ function frontendCarToDB(data) {
 
 // ─── API ROUTES ────────────────────────────────────────────────────────────
 
-// Config für Frontend (Supabase Anon Key)
+// Config für Frontend (früher Supabase Anon Key – jetzt nicht mehr nötig,
+// Endpunkt bleibt aus Kompatibilitätsgründen erhalten)
 app.get('/api/config', (req, res) => {
-  res.json({ anonKey: process.env.SUPABASE_KEY });
+  res.json({});
 });
 
 // Alle Daten
-app.get('/api/data', async (req, res) => {
+app.get('/api/data', (req, res) => {
   try {
-    const { data: cars } = await supabase.from('cars').select('*');
-    const { data: potTransactions } = await supabase.from('pot_transactions').select('*');
-    const calc = await recalculate();
+    const calc = recalculate();
+    const cars = db.getCars();
+    const potTransactions = db.getPotTransactions();
     res.json({
       cars: (cars || []).map(dbCarToFrontend),
-      pot: { balance: calc.potBalance, totalInvested: calc.totalInvested, totalRevenue: calc.totalRevenue },
+      pot: { balance: calc.potBalance, totalInvested: calc.totalInvested, totalRevenue: calc.totalRevenue, totalOverhead: calc.totalOverhead },
       partners: calc.partners,
-      potTransactions: potTransactions || []
+      potTransactions: potTransactions || [],
+      generalExpenses: db.getGeneralExpensesOrdered(),
+      recurringExpenses: db.getRecurringExpenses()
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -193,10 +354,10 @@ app.get('/api/data', async (req, res) => {
 });
 
 // Stats fürs Dashboard
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', (req, res) => {
   try {
-    const { data: cars } = await supabase.from('cars').select('*');
-    const calc = await recalculate();
+    const cars = db.getCars();
+    const calc = recalculate();
 
     const frontendCars = (cars || []).map(dbCarToFrontend);
     const activeCars = frontendCars.filter(c => c.status !== 'sold' && c.status !== 'visited');
@@ -232,7 +393,10 @@ app.get('/api/stats', async (req, res) => {
       avgDays,
       partners: calc.partners,
       totalInvested: calc.totalInvested,
-      totalRevenue: calc.totalRevenue
+      totalRevenue: calc.totalRevenue,
+      totalOverhead: calc.totalOverhead,
+      // Netto-Gewinn = reiner Auto-Handelsgewinn minus Betriebskosten
+      netProfit: round2(totalProfit - calc.totalOverhead)
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -240,10 +404,9 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Alle Autos
-app.get('/api/cars', async (req, res) => {
+app.get('/api/cars', (req, res) => {
   try {
-    const { data, error } = await supabase.from('cars').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    const data = db.getCarsOrdered();
     res.json((data || []).map(dbCarToFrontend));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -251,10 +414,10 @@ app.get('/api/cars', async (req, res) => {
 });
 
 // Ein Auto
-app.get('/api/cars/:id', async (req, res) => {
+app.get('/api/cars/:id', (req, res) => {
   try {
-    const { data, error } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (error || !data) return res.status(404).json({ error: 'Nicht gefunden' });
+    const data = db.getCar(req.params.id);
+    if (!data) return res.status(404).json({ error: 'Nicht gefunden' });
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -262,7 +425,7 @@ app.get('/api/cars/:id', async (req, res) => {
 });
 
 // Auto anlegen
-app.post('/api/cars', async (req, res) => {
+app.post('/api/cars', (req, res) => {
   try {
     const id = 'car_' + Date.now();
     const row = {
@@ -294,11 +457,16 @@ app.post('/api/cars', async (req, res) => {
       buyer_contact: '',
       status: req.body.status || 'purchased',
       notes: req.body.notes || '',
+      previous_owners: req.body.previousOwners || null,
+      service_history: req.body.serviceHistory || '',
+      last_service_date: req.body.lastServiceDate || null,
+      last_service_km: req.body.lastServiceKm || null,
       expenses: [],
-      status_history: [{ status: req.body.status || 'purchased', date: new Date().toISOString(), note: 'Auto angelegt' }]
+      status_history: [{ status: req.body.status || 'purchased', date: new Date().toISOString(), note: 'Auto angelegt' }],
+      photos: [],
+      created_at: new Date().toISOString()
     };
-    const { data, error } = await supabase.from('cars').insert(row).select().single();
-    if (error) throw error;
+    const data = db.insertCar(row);
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -306,10 +474,10 @@ app.post('/api/cars', async (req, res) => {
 });
 
 // Auto bearbeiten
-app.put('/api/cars/:id', async (req, res) => {
+app.put('/api/cars/:id', (req, res) => {
   try {
-    const { data: existing, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !existing) return res.status(404).json({ error: 'Nicht gefunden' });
+    const existing = db.getCar(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const updates = frontendCarToDB(req.body);
 
@@ -320,8 +488,7 @@ app.put('/api/cars/:id', async (req, res) => {
       updates.status_history = history;
     }
 
-    const { data, error } = await supabase.from('cars').update(updates).eq('id', req.params.id).select().single();
-    if (error) throw error;
+    const data = db.updateCar(req.params.id, updates);
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -329,10 +496,9 @@ app.put('/api/cars/:id', async (req, res) => {
 });
 
 // Auto löschen
-app.delete('/api/cars/:id', async (req, res) => {
+app.delete('/api/cars/:id', (req, res) => {
   try {
-    const { error } = await supabase.from('cars').delete().eq('id', req.params.id);
-    if (error) throw error;
+    db.deleteCar(req.params.id);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -340,10 +506,10 @@ app.delete('/api/cars/:id', async (req, res) => {
 });
 
 // Ausgabe hinzufügen
-app.post('/api/cars/:id/expenses', async (req, res) => {
+app.post('/api/cars/:id/expenses', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const car = db.getCar(req.params.id);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const expense = {
       id: 'exp_' + Date.now(),
@@ -358,8 +524,7 @@ app.post('/api/cars/:id/expenses', async (req, res) => {
     };
 
     const expenses = [...(car.expenses || []), expense];
-    const { error } = await supabase.from('cars').update({ expenses }).eq('id', req.params.id);
-    if (error) throw error;
+    db.updateCar(req.params.id, { expenses });
     res.json(expense);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -367,14 +532,13 @@ app.post('/api/cars/:id/expenses', async (req, res) => {
 });
 
 // Ausgabe löschen
-app.delete('/api/cars/:carId/expenses/:expId', async (req, res) => {
+app.delete('/api/cars/:carId/expenses/:expId', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.carId).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const car = db.getCar(req.params.carId);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const expenses = (car.expenses || []).filter(e => e.id !== req.params.expId);
-    const { error } = await supabase.from('cars').update({ expenses }).eq('id', req.params.carId);
-    if (error) throw error;
+    db.updateCar(req.params.carId, { expenses });
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -382,10 +546,10 @@ app.delete('/api/cars/:carId/expenses/:expId', async (req, res) => {
 });
 
 // Ausgabe erstatten
-app.post('/api/cars/:carId/expenses/:expId/reimburse', async (req, res) => {
+app.post('/api/cars/:carId/expenses/:expId/reimburse', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.carId).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const car = db.getCar(req.params.carId);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const expenses = (car.expenses || []).map(e => {
       if (e.id === req.params.expId) {
@@ -394,8 +558,7 @@ app.post('/api/cars/:carId/expenses/:expId/reimburse', async (req, res) => {
       return e;
     });
     const expense = expenses.find(e => e.id === req.params.expId);
-    const { error } = await supabase.from('cars').update({ expenses }).eq('id', req.params.carId);
-    if (error) throw error;
+    db.updateCar(req.params.carId, { expenses });
     res.json(expense);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -403,10 +566,11 @@ app.post('/api/cars/:carId/expenses/:expId/reimburse', async (req, res) => {
 });
 
 // Kaufpreis erstatten
-app.post('/api/cars/:id/reimburse-purchase', async (req, res) => {
+app.post('/api/cars/:id/reimburse-purchase', (req, res) => {
   try {
-    const { data, error } = await supabase.from('cars').update({ purchase_reimbursed: true }).eq('id', req.params.id).select().single();
-    if (error) throw error;
+    const existing = db.getCar(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Nicht gefunden' });
+    const data = db.updateCar(req.params.id, { purchase_reimbursed: true });
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -414,24 +578,23 @@ app.post('/api/cars/:id/reimburse-purchase', async (req, res) => {
 });
 
 // Auto verkaufen
-app.post('/api/cars/:id/sell', async (req, res) => {
+app.post('/api/cars/:id/sell', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const car = db.getCar(req.params.id);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const history = car.status_history || [];
     const sellPrice = req.body.actualSellPrice || 0;
     history.push({ status: 'sold', date: new Date().toISOString(), note: 'Verkauft für ' + sellPrice + ' Euro' });
 
-    const { data, error } = await supabase.from('cars').update({
+    const data = db.updateCar(req.params.id, {
       actual_sell_price: sellPrice,
       sale_date: req.body.saleDate || new Date().toISOString().split('T')[0],
       buyer_name: req.body.buyerName || '',
       buyer_contact: req.body.buyerContact || '',
       status: 'sold',
       status_history: history
-    }).eq('id', req.params.id).select().single();
-    if (error) throw error;
+    });
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -439,7 +602,7 @@ app.post('/api/cars/:id/sell', async (req, res) => {
 });
 
 // Pot Einzahlung
-app.post('/api/pot/deposit', async (req, res) => {
+app.post('/api/pot/deposit', (req, res) => {
   try {
     const transaction = {
       id: 'pot_' + Date.now(),
@@ -447,10 +610,29 @@ app.post('/api/pot/deposit', async (req, res) => {
       amount: req.body.amount || 0,
       partner_id: req.body.partnerId || '',
       date: req.body.date || new Date().toISOString().split('T')[0],
-      note: req.body.note || ''
+      note: req.body.note || '',
+      created_at: new Date().toISOString()
     };
-    const { data, error } = await supabase.from('pot_transactions').insert(transaction).select().single();
-    if (error) throw error;
+    const data = db.insertPotTransaction(transaction);
+    res.json({ ...data, partnerId: data.partner_id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Pot Entnahme / Auszahlung (Gegenstueck zur Einzahlung)
+app.post('/api/pot/withdraw', (req, res) => {
+  try {
+    const transaction = {
+      id: 'pot_' + Date.now(),
+      type: 'withdrawal',
+      amount: req.body.amount || 0,
+      partner_id: req.body.partnerId || '',
+      date: req.body.date || new Date().toISOString().split('T')[0],
+      note: req.body.note || '',
+      created_at: new Date().toISOString()
+    };
+    const data = db.insertPotTransaction(transaction);
     res.json({ ...data, partnerId: data.partner_id });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -458,10 +640,9 @@ app.post('/api/pot/deposit', async (req, res) => {
 });
 
 // Pot Transaktionen laden
-app.get('/api/pot/transactions', async (req, res) => {
+app.get('/api/pot/transactions', (req, res) => {
   try {
-    const { data, error } = await supabase.from('pot_transactions').select('*').order('date', { ascending: false });
-    if (error) throw error;
+    const data = db.getPotTransactionsOrdered();
     // partnerId für Frontend mappen
     res.json((data || []).map(t => ({ ...t, partnerId: t.partner_id })));
   } catch (e) {
@@ -470,21 +651,138 @@ app.get('/api/pot/transactions', async (req, res) => {
 });
 
 // Pot Transaktion löschen
-app.delete('/api/pot/transactions/:id', async (req, res) => {
+app.delete('/api/pot/transactions/:id', (req, res) => {
   try {
-    const { error } = await supabase.from('pot_transactions').delete().eq('id', req.params.id);
-    if (error) throw error;
+    db.deletePotTransaction(req.params.id);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Datei hochladen (Foto oder PDF → Supabase Storage)
-app.post('/api/cars/:id/photos/upload', async (req, res) => {
+// ─── ALLGEMEINE KOSTEN (autofrei: Server, Werkzeug, Miete ...) ───────────────
+
+// Liste: einzelne Buchungen + wiederkehrende Regeln + Summe
+app.get('/api/general-expenses', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const calc = recalculate(); // bucht faellige wiederkehrende Kosten nach
+    res.json({
+      expenses: db.getGeneralExpensesOrdered(),
+      recurring: db.getRecurringExpenses(),
+      totalOverhead: calc.totalOverhead
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Einzelne (einmalige) Kosten anlegen
+app.post('/api/general-expenses', (req, res) => {
+  try {
+    const expense = {
+      id: 'gexp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      category: req.body.category || 'sonstiges',
+      amount: req.body.amount || 0,
+      funding_source: req.body.fundingSource || 'pot',
+      paid_by: req.body.fundingSource === 'private' ? (req.body.paidBy || '') : '',
+      reimbursed: 0,
+      reimbursed_date: null,
+      date: req.body.date || new Date().toISOString().split('T')[0],
+      note: req.body.note || '',
+      recurring_id: null,
+      auto_generated: 0,
+      period: null,
+      created_at: new Date().toISOString()
+    };
+    const data = db.insertGeneralExpense(expense);
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Kosten löschen
+app.delete('/api/general-expenses/:id', (req, res) => {
+  try {
+    db.deleteGeneralExpense(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Kosten als erstattet markieren (nur bei private relevant)
+app.post('/api/general-expenses/:id/reimburse', (req, res) => {
+  try {
+    const exp = db.getGeneralExpense(req.params.id);
+    if (!exp) return res.status(404).json({ error: 'Nicht gefunden' });
+    const data = db.updateGeneralExpense(req.params.id, {
+      reimbursed: 1,
+      reimbursed_date: new Date().toISOString().split('T')[0]
+    });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── WIEDERKEHRENDE KOSTEN-REGELN ────────────────────────────────────────────
+
+// Regel anlegen (und sofort faellige Monate nachbuchen)
+app.post('/api/recurring-expenses', (req, res) => {
+  try {
+    const rule = {
+      id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      category: req.body.category || 'sonstiges',
+      amount: req.body.amount || 0,
+      funding_source: req.body.fundingSource || 'pot',
+      paid_by: req.body.fundingSource === 'private' ? (req.body.paidBy || '') : '',
+      day_of_month: Math.min(Math.max(parseInt(req.body.dayOfMonth) || 1, 1), 28),
+      start_date: req.body.startDate || new Date().toISOString().split('T')[0],
+      active: 1,
+      note: req.body.note || '',
+      last_period: null,
+      created_at: new Date().toISOString()
+    };
+    db.insertRecurringExpense(rule);
+    materializeRecurring(); // vergangene + aktuellen Monat sofort buchen
+    res.json(db.getRecurringExpense(rule.id));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Regel stoppen: keine neuen Monatsbuchungen mehr, bestehende bleiben erhalten
+app.post('/api/recurring-expenses/:id/stop', (req, res) => {
+  try {
+    const rule = db.getRecurringExpense(req.params.id);
+    if (!rule) return res.status(404).json({ error: 'Nicht gefunden' });
+    const data = db.updateRecurringExpense(req.params.id, { active: 0 });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Regel komplett löschen. ?withBookings=1 entfernt auch alle automatisch
+// erzeugten Buchungen dieser Regel (Voll-Rückgängig, z.B. bei Fehleingabe).
+app.delete('/api/recurring-expenses/:id', (req, res) => {
+  try {
+    if (req.query.withBookings === '1') {
+      db.deleteGeneralExpensesByRecurring(req.params.id);
+    }
+    db.deleteRecurringExpense(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Datei hochladen (Foto oder PDF → lokaler Ordner data/uploads)
+app.post('/api/cars/:id/photos/upload', (req, res) => {
+  try {
+    const car = db.getCar(req.params.id);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const { imageData, pdfData, fileName, type } = req.body;
     const isPdf  = type === 'pdf' && pdfData;
@@ -496,28 +794,22 @@ app.post('/api/cars/:id/photos/upload', async (req, res) => {
     console.log(`📦 ${isPdf ? 'PDF' : 'Foto'} Upload:`, Math.round(buffer.length / 1024), 'KB');
 
     const ext      = isPdf ? 'pdf' : (fileName || 'foto.jpg').split('.').pop().toLowerCase();
-    const filePath = `${req.params.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const mimeType = isPdf ? 'application/pdf' : 'image/jpeg';
+    const safeFile = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const { error: uploadErr } = await supabase.storage
-      .from('car-photos')
-      .upload(filePath, buffer, { contentType: mimeType, upsert: true });
+    // Pro Auto ein Unterordner: data/uploads/<carId>/<datei>
+    const carDir = path.join(UPLOADS_DIR, req.params.id);
+    fs.mkdirSync(carDir, { recursive: true });
+    fs.writeFileSync(path.join(carDir, safeFile), buffer);
 
-    if (uploadErr) {
-      console.error('Storage Fehler:', uploadErr.message);
-      return res.status(500).json({ error: uploadErr.message });
-    }
-
-    const { data: urlData } = supabase.storage.from('car-photos').getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
+    // Öffentliche URL (relativ, wird von express.static unter /uploads bedient)
+    const publicUrl = `/uploads/${req.params.id}/${safeFile}`;
 
     // PDFs als "name|pdf|url" speichern damit Frontend den Dateinamen kennt
     const safeName  = (fileName || 'Dokument').replace(/[|]/g, '_').replace(/\.pdf$/i, '');
     const storedUrl = isPdf ? `${safeName}|pdf|${publicUrl}` : publicUrl;
 
     const photos = [...(car.photos || []), storedUrl];
-    const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    const data = db.updateCar(req.params.id, { photos });
 
     console.log('✅ Gespeichert:', isPdf ? 'PDF' : 'Foto', photos.length, 'Dateien gesamt');
     res.json(dbCarToFrontend(data));
@@ -528,21 +820,25 @@ app.post('/api/cars/:id/photos/upload', async (req, res) => {
 });
 
 // Foto löschen
-app.delete('/api/cars/:id/photos', async (req, res) => {
+app.delete('/api/cars/:id/photos', (req, res) => {
   try {
-    const { data: car, error: fetchErr } = await supabase.from('cars').select('*').eq('id', req.params.id).single();
-    if (fetchErr || !car) return res.status(404).json({ error: 'Nicht gefunden' });
+    const car = db.getCar(req.params.id);
+    if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
 
     const { url } = req.body;
-    // Aus Storage löschen
-    const pathPart = url.split('/car-photos/')[1];
+    // Aus lokalem Speicher löschen. url kann "name|pdf|/uploads/..." oder "/uploads/..." sein.
+    const rawUrl   = url && url.includes('|pdf|') ? url.split('|pdf|')[1] : url;
+    const pathPart = rawUrl && rawUrl.split('/uploads/')[1];
     if (pathPart) {
-      await supabase.storage.from('car-photos').remove([pathPart]);
+      const filePath = path.join(UPLOADS_DIR, pathPart);
+      // Sicherheitscheck: Pfad muss innerhalb von UPLOADS_DIR liegen
+      if (filePath.startsWith(UPLOADS_DIR) && fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (err) { console.error('Datei-Löschfehler:', err.message); }
+      }
     }
 
     const photos = (car.photos || []).filter(u => u !== url);
-    const { data, error } = await supabase.from('cars').update({ photos }).eq('id', req.params.id).select().single();
-    if (error) throw error;
+    const data = db.updateCar(req.params.id, { photos });
     res.json(dbCarToFrontend(data));
   } catch (e) {
     res.status(500).json({ error: e.message });

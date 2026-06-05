@@ -6,6 +6,13 @@
   <title>🚗 Auto-Tracker | Mert & Tobias</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- PDF.js: rendert ALLE Seiten (iframe zeigt auf iOS nur Seite 1) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -38,6 +45,17 @@
     input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     .card-hover { transition: all 0.2s; }
     .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    /* iOS Safari: native Datums-/Zeitfelder respektieren sonst die Breite nicht
+       und ragen aus ihrer Spalte ins Nachbarfeld. */
+    input[type="date"], input[type="time"], input[type="datetime-local"] {
+      -webkit-appearance: none;
+      appearance: none;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+    input[type="date"]::-webkit-calendar-picker-indicator { margin-left: 0; }
   </style>
 </head>
 <body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
@@ -69,6 +87,7 @@
         <button onclick="showPage('dashboard')" data-tab="dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">📊 Dashboard</button>
         <button onclick="showPage('cars')" data-tab="cars" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">🚗 Autos</button>
         <button onclick="showPage('pot')" data-tab="pot" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">💰 Pot</button>
+        <button onclick="showPage('costs')" data-tab="costs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">🧾 Kosten</button>
       </div>
     </div>
   </div>
@@ -104,6 +123,8 @@
             <div class="flex justify-between items-center"><span class="text-dark-300">Ø Gewinn pro Auto</span><span id="stat-avg-profit" class="font-bold text-accent-400">0,00 €</span></div>
             <div class="flex justify-between items-center"><span class="text-dark-300">Gesamt investiert</span><span id="stat-invested" class="font-bold text-brand-400">0,00 €</span></div>
             <div class="flex justify-between items-center"><span class="text-dark-300">Gesamt Umsatz</span><span id="stat-revenue" class="font-bold">0,00 €</span></div>
+            <div class="flex justify-between items-center"><span class="text-dark-300">Betriebskosten</span><span id="stat-overhead" class="font-bold text-danger-400">0,00 €</span></div>
+            <div class="flex justify-between items-center border-t border-dark-700 pt-3 mt-1"><span class="text-dark-200 font-medium">Netto-Gewinn <span class="text-xs text-dark-500">(nach Betriebskosten)</span></span><span id="stat-net-profit" class="font-bold text-accent-400">0,00 €</span></div>
           </div>
         </div>
         <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 card-hover">
@@ -167,9 +188,14 @@
           <h2 class="text-xl font-bold">💰 Pot-Verwaltung</h2>
           <p class="text-sm text-dark-400">Gemeinsame Kasse</p>
         </div>
-        <button onclick="openDepositModal()" class="bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
-          <span>+</span> Einzahlung
-        </button>
+        <div class="flex gap-2 w-full sm:w-auto">
+          <button onclick="openWithdrawModal()" class="flex-1 sm:flex-none bg-dark-700 hover:bg-dark-600 border border-dark-600 text-warn-400 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+            <span>−</span> Entnahme
+          </button>
+          <button onclick="openDepositModal()" class="flex-1 sm:flex-none bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+            <span>+</span> Einzahlung
+          </button>
+        </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
@@ -189,6 +215,53 @@
         <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">Transaktionen</h3>
         <div id="pot-transactions" class="space-y-2"></div>
         <div id="pot-empty" class="hidden text-center py-8 text-dark-400">Keine Transaktionen vorhanden</div>
+      </div>
+    </div>
+
+    <!-- COSTS PAGE (Allgemeine Kosten, autofrei) -->
+    <div id="page-costs" class="page hidden fade-in">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 class="text-xl font-bold">🧾 Allgemeine Kosten</h2>
+          <p class="text-sm text-dark-400">Betriebskosten ohne Auto-Bezug (Server, Werkzeug, Miete …)</p>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+          <button onclick="openRecurringModal()" class="flex-1 sm:flex-none bg-dark-700 hover:bg-dark-600 border border-dark-600 text-dark-200 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 whitespace-nowrap">
+            🔁 Monatlich
+          </button>
+          <button onclick="openGeneralExpenseModal()" class="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 whitespace-nowrap">
+            <span>+</span> Kosten erfassen
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+          <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Betriebskosten gesamt</div>
+          <div id="costs-total" class="text-3xl font-bold text-danger-400">0,00 €</div>
+        </div>
+        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+          <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Davon offen (privat)</div>
+          <div id="costs-open" class="text-2xl font-bold text-warn-400">0,00 €</div>
+        </div>
+        <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 text-center">
+          <div class="text-xs text-dark-400 uppercase tracking-wide mb-1">Aktive Daueraufträge</div>
+          <div id="costs-recurring-count" class="text-2xl font-bold text-brand-400">0</div>
+        </div>
+      </div>
+
+      <!-- Wiederkehrende Regeln -->
+      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-4">
+        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">🔁 Monatliche Daueraufträge</h3>
+        <div id="costs-recurring" class="space-y-2"></div>
+        <div id="costs-recurring-empty" class="hidden text-center py-6 text-dark-400 text-sm">Keine monatlichen Kosten eingerichtet</div>
+      </div>
+
+      <!-- Einzelne Buchungen -->
+      <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-dark-300 uppercase tracking-wide mb-3">Buchungen</h3>
+        <div id="costs-list" class="space-y-2"></div>
+        <div id="costs-empty" class="hidden text-center py-8 text-dark-400">Noch keine Kosten erfasst</div>
       </div>
     </div>
   </main>
@@ -242,6 +315,31 @@
         <div>
           <label class="text-xs text-dark-400 mb-1 block">FIN (Fahrgestellnummer)</label>
           <input id="f-vin" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500 font-mono" placeholder="WBAXXXXXXXX">
+        </div>
+
+        <hr class="border-dark-700">
+        <div>
+          <label class="text-xs text-dark-400 uppercase tracking-wide font-semibold mb-2 block">Historie & Zustand</label>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-dark-400 mb-1 block">Anzahl Vorbesitzer</label>
+              <input id="f-prevOwners" type="number" min="0" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. 2">
+            </div>
+            <div>
+              <label class="text-xs text-dark-400 mb-1 block">Scheckheftgepflegt</label>
+              <select id="f-scheckheft" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                <option value="">–</option><option value="ja">Ja</option><option value="nein">Nein</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-dark-400 mb-1 block">Letzter Service (Datum)</label>
+              <input id="f-lastServiceDate" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="text-xs text-dark-400 mb-1 block">Letzter Service bei (km)</label>
+              <input id="f-lastServiceKm" type="number" min="0" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. 85000">
+            </div>
+          </div>
         </div>
 
         <hr class="border-dark-700">
@@ -478,6 +576,146 @@
     </div>
   </div>
 
+  <!-- MODAL: Entnahme / Auszahlung -->
+  <div id="withdraw-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeWithdrawModal()"></div>
+    <div class="relative z-10 max-w-md mx-auto mt-20 bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
+      <div class="border-b border-dark-700 px-6 py-4 flex justify-between items-center">
+        <h2 class="text-lg font-bold">💸 Entnahme aus dem Pot</h2>
+        <button onclick="closeWithdrawModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
+      </div>
+      <form id="withdraw-form" onsubmit="saveWithdraw(event)" class="p-6 space-y-4">
+        <div><label class="text-xs text-dark-400 mb-1 block">Betrag (€) *</label><input id="wd-amount" type="number" step="0.01" required class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400" placeholder="500"></div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Entnommen von</label>
+          <select id="wd-partner" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400">
+            <option value="mert">Mert</option><option value="tobias">Tobias</option><option value="both">Beide</option>
+          </select>
+        </div>
+        <div><label class="text-xs text-dark-400 mb-1 block">Datum</label><input id="wd-date" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400"></div>
+        <div><label class="text-xs text-dark-400 mb-1 block">Notiz</label><input id="wd-note" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-warn-400" placeholder="z.B. Gewinnauszahlung / Privatentnahme"></div>
+        <button type="submit" class="w-full bg-warn-500 hover:bg-warn-400 text-dark-900 py-2.5 rounded-lg font-medium transition">Entnahme buchen</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Allgemeine Kosten (einmalig) -->
+  <div id="gexp-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeGeneralExpenseModal()"></div>
+    <div class="relative z-10 max-w-lg mx-auto mt-16 max-h-[90vh] overflow-y-auto bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
+      <div class="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+        <h2 class="text-lg font-bold">🧾 Allgemeine Kosten erfassen</h2>
+        <button onclick="closeGeneralExpenseModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
+      </div>
+      <form id="gexp-form" onsubmit="saveGeneralExpense(event)" class="p-6 space-y-4">
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Kategorie</label>
+          <select id="gexp-category" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+            <option value="server">🖥️ Server / Hosting</option>
+            <option value="software">💻 Software / Abo</option>
+            <option value="werkzeug">🔧 Werkzeug</option>
+            <option value="miete">🏠 Miete / Stellplatz</option>
+            <option value="versicherung">🛡️ Versicherung</option>
+            <option value="buero">📎 Büro / Material</option>
+            <option value="marketing">📢 Marketing / Werbung</option>
+            <option value="gebuehren">🏦 Gebühren</option>
+            <option value="sonstiges">📦 Sonstiges</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Betrag (€) *</label>
+          <input id="gexp-amount" type="number" step="0.01" required class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="29.99">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-dark-400 mb-1 block">Bezahlt aus</label>
+            <select id="gexp-funding" onchange="toggleGexpPaidBy()" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+              <option value="pot">Pot</option><option value="private">Privat</option>
+            </select>
+          </div>
+          <div id="gexp-paidby-wrap" class="hidden">
+            <label class="text-xs text-dark-400 mb-1 block">Bezahlt von</label>
+            <select id="gexp-paidby" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+              <option value="mert">Mert</option><option value="tobias">Tobias</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Datum</label>
+          <input id="gexp-date" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Notiz</label>
+          <input id="gexp-note" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. Hetzner Server Juni">
+        </div>
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-lg font-medium transition">Kosten speichern</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Wiederkehrende Kosten (monatlich) -->
+  <div id="recurring-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeRecurringModal()"></div>
+    <div class="relative z-10 max-w-lg mx-auto mt-16 max-h-[90vh] overflow-y-auto bg-dark-800 border border-dark-700 rounded-2xl shadow-2xl m-4">
+      <div class="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+        <h2 class="text-lg font-bold">🔁 Monatliche Kosten einrichten</h2>
+        <button onclick="closeRecurringModal()" class="text-dark-400 hover:text-white text-xl transition">✕</button>
+      </div>
+      <form id="recurring-form" onsubmit="saveRecurring(event)" class="p-6 space-y-4">
+        <div class="bg-brand-600/10 border border-brand-500/20 rounded-lg p-3 text-xs text-dark-300">
+          ℹ️ Wird ab dem Startdatum <b>jeden Monat automatisch</b> als Kosten gebucht – auch rückwirkend nachgeholt. Du kannst den Dauerauftrag jederzeit stoppen.
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Kategorie</label>
+          <select id="rec-category" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+            <option value="server">🖥️ Server / Hosting</option>
+            <option value="software">💻 Software / Abo</option>
+            <option value="werkzeug">🔧 Werkzeug</option>
+            <option value="miete">🏠 Miete / Stellplatz</option>
+            <option value="versicherung">🛡️ Versicherung</option>
+            <option value="buero">📎 Büro / Material</option>
+            <option value="marketing">📢 Marketing / Werbung</option>
+            <option value="gebuehren">🏦 Gebühren</option>
+            <option value="sonstiges">📦 Sonstiges</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Betrag pro Monat (€) *</label>
+          <input id="rec-amount" type="number" step="0.01" required class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="29.99">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-dark-400 mb-1 block">Bezahlt aus</label>
+            <select id="rec-funding" onchange="toggleRecPaidBy()" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+              <option value="pot">Pot</option><option value="private">Privat</option>
+            </select>
+          </div>
+          <div id="rec-paidby-wrap" class="hidden">
+            <label class="text-xs text-dark-400 mb-1 block">Bezahlt von</label>
+            <select id="rec-paidby" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+              <option value="mert">Mert</option><option value="tobias">Tobias</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-dark-400 mb-1 block">Startdatum</label>
+            <input id="rec-start" type="date" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+          </div>
+          <div>
+            <label class="text-xs text-dark-400 mb-1 block">Tag im Monat (1–28)</label>
+            <input id="rec-day" type="number" min="1" max="28" value="1" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-dark-400 mb-1 block">Notiz</label>
+          <input id="rec-note" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="z.B. Hetzner Server">
+        </div>
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-lg font-medium transition">Dauerauftrag anlegen</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
     <div class="bg-dark-700 border border-dark-600 rounded-xl px-5 py-3 shadow-2xl flex items-center gap-3">
@@ -487,7 +725,7 @@
   </div>
 
 <script>
-const API = '';
+const API = '/tracker';  // App laeuft unter autoscanner.space/tracker (nginx-Unterpfad)
 let currentCarId = null;
 let allCars = [];
 
@@ -503,6 +741,10 @@ const statusColors = {
 };
 const catLabels = { reparatur:'Reparatur', tuev:'TÜV/AU', zulassung:'Zulassung', aufbereitung:'Aufbereitung', transport:'Transport', inserat:'Inserat', versicherung:'Versicherung', steuer:'Steuer', tanken:'Tanken', besichtigung:'Besichtigung', sonstiges:'Sonstiges' };
 const catIcons  = { reparatur:'🔧', tuev:'📋', zulassung:'📄', aufbereitung:'✨', transport:'🚚', inserat:'📢', versicherung:'🛡️', steuer:'💼', tanken:'⛽', besichtigung:'👁️', sonstiges:'📦' };
+// Kategorien fuer allgemeine Kosten (autofrei)
+const gexpCatLabels = { server:'Server / Hosting', software:'Software / Abo', werkzeug:'Werkzeug', miete:'Miete / Stellplatz', versicherung:'Versicherung', buero:'Büro / Material', marketing:'Marketing', gebuehren:'Gebühren', sonstiges:'Sonstiges' };
+const gexpCatIcons  = { server:'🖥️', software:'💻', werkzeug:'🔧', miete:'🏠', versicherung:'🛡️', buero:'📎', marketing:'📢', gebuehren:'🏦', sonstiges:'📦' };
+const partnerName = (id) => id === 'mert' ? 'Mert' : id === 'tobias' ? 'Tobias' : (id || '');
 
 function showToast(msg, icon = '✅') {
   const t = document.getElementById('toast');
@@ -527,6 +769,7 @@ function showPage(page) {
   if (page === 'dashboard') loadDashboard();
   if (page === 'cars') loadCars();
   if (page === 'pot') loadPot();
+  if (page === 'costs') loadCosts();
   if (page === 'car-detail' && currentCarId) loadCarDetail(currentCarId);
 }
 
@@ -543,6 +786,9 @@ async function loadDashboard() {
   document.getElementById('stat-avg-profit').textContent = fmt(stats.avgProfit);
   document.getElementById('stat-invested').textContent   = fmt(stats.totalInvested);
   document.getElementById('stat-revenue').textContent    = fmt(stats.totalRevenue);
+  document.getElementById('stat-overhead').textContent   = fmt(stats.totalOverhead);
+  document.getElementById('stat-net-profit').textContent = fmt(stats.netProfit);
+  document.getElementById('stat-net-profit').className   = 'font-bold ' + ((stats.netProfit || 0) >= 0 ? 'text-accent-400' : 'text-danger-400');
 
   document.getElementById('dash-reimbursements').innerHTML = stats.partners.map(p => `
     <div class="flex justify-between items-center">
@@ -703,6 +949,9 @@ async function loadCarDetail(id) {
         <div class="space-y-2 text-sm">
           <div class="flex justify-between"><span class="text-dark-400">FIN</span><span class="font-mono">${car.vin||'–'}</span></div>
           <div class="flex justify-between"><span class="text-dark-400">Kilometerstand</span><span>${car.mileage?car.mileage.toLocaleString('de-DE')+' km':'–'}</span></div>
+          ${(car.previousOwners!==null && car.previousOwners!==undefined && car.previousOwners!=='')?'<div class="flex justify-between"><span class="text-dark-400">Vorbesitzer</span><span>'+car.previousOwners+'</span></div>':''}
+          ${car.serviceHistory?'<div class="flex justify-between"><span class="text-dark-400">Scheckheft</span><span>'+(car.serviceHistory==='ja'?'✅ gepflegt':'❌ nein')+'</span></div>':''}
+          ${(car.lastServiceDate||car.lastServiceKm)?'<div class="flex justify-between"><span class="text-dark-400">Letzter Service</span><span>'+[car.lastServiceDate?fmtDate(car.lastServiceDate):null,car.lastServiceKm?car.lastServiceKm.toLocaleString('de-DE')+' km':null].filter(Boolean).join(' · ')+'</span></div>':''}
           <div class="flex justify-between"><span class="text-dark-400">Kaufdatum</span><span>${fmtDate(car.purchaseDate)}</span></div>
           ${car.saleDate?'<div class="flex justify-between"><span class="text-dark-400">Verkaufsdatum</span><span>'+fmtDate(car.saleDate)+'</span></div>':''}
           ${!isVisited?'<div class="flex justify-between"><span class="text-dark-400">Bezahlung</span><span>'+(car.purchaseFunding==='pot'?'💰 Pot':'👤 Privat ('+(car.purchasePaidBy||'')+')') +'</span></div>':''}
@@ -768,9 +1017,12 @@ async function loadCarDetail(id) {
     <div id="pdf-viewer" class="fixed inset-0 z-50 hidden flex-col bg-dark-900">
       <div class="flex items-center justify-between px-4 py-3 bg-dark-800 border-b border-dark-700">
         <span class="text-sm font-medium">📄 PDF Dokument</span>
-        <button onclick="closePDF()" class="text-dark-400 hover:text-white text-xl px-2">✕ Schließen</button>
+        <div class="flex items-center gap-4">
+          <a id="pdf-open-tab" href="#" target="_blank" rel="noopener" class="text-brand-400 hover:text-brand-300 text-sm">↗ Neuer Tab</a>
+          <button onclick="closePDF()" class="text-dark-400 hover:text-white text-xl px-2">✕ Schließen</button>
+        </div>
       </div>
-      <iframe id="pdf-frame" src="" class="flex-1 w-full border-0"></iframe>
+      <div id="pdf-pages" class="flex-1 w-full overflow-y-auto p-3 sm:p-4"></div>
     </div>
 
     <div class="bg-dark-800 border border-dark-700 rounded-xl p-5">
@@ -804,7 +1056,7 @@ function renderDateien(car) {
     for (var i = 0; i < photos.length; i++) {
       var url = photos[i];
       html += '<div class="relative group aspect-square">';
-      html += '<img src="' + url + '" class="w-full h-full object-cover rounded-xl cursor-pointer" onclick="openLightbox(this.src)" loading="lazy">';
+      html += '<img src="' + API + url + '" class="w-full h-full object-cover rounded-xl cursor-pointer" onclick="openLightbox(this.src)" loading="lazy">';
       html += '<button data-carid="' + car.id + '" data-url="' + i + '" onclick="deleteFileByIndex(this, false)" class="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-500 text-white w-7 h-7 rounded-full text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">✕</button>';
       if (i === 0) html += '<span class="absolute bottom-1.5 left-1.5 bg-black/60 text-xs text-white px-2 py-0.5 rounded-full">Titelbild</span>';
       html += '</div>';
@@ -823,7 +1075,7 @@ function renderDateien(car) {
       html += '<div class="flex items-center gap-3"><span class="text-2xl">📄</span>';
       html += '<div><div class="text-sm font-medium">' + namePart + '</div><div class="text-xs text-dark-400">PDF Dokument</div></div></div>';
       html += '<div class="flex items-center gap-2">';
-      html += '<button data-pdfurl="' + rawUrl + '" onclick="openPDF(this.dataset.pdfurl)" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg transition">Öffnen</button>';
+      html += '<button data-pdfurl="' + API + rawUrl + '" onclick="openPDF(this.dataset.pdfurl)" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg transition">Öffnen</button>';
       html += '<button data-carid="' + car.id + '" data-url="' + j + '" onclick="deleteFileByIndex(this, true)" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm ml-1">🗑️</button>';
       html += '</div></div>';
     }
@@ -869,12 +1121,20 @@ async function uploadDateien(event, carId, type) {
   const text     = document.getElementById('upload-progress-text');
   if (progress) { progress.classList.remove('hidden'); bar.style.width = '5%'; }
 
-  let uploaded = 0, failed = 0;
+  // PDFs gehen ungekuerzt raus -> roh max ~36 MB (passt nach Base64 unter 50 MB)
+  const MAX_PDF_BYTES = 36 * 1024 * 1024;
+
+  let uploaded = 0, failed = 0, tooLarge = 0;
 
   for (const file of files) {
     try {
       let payload;
       if (type === 'pdf') {
+        if (file.size > MAX_PDF_BYTES) {
+          console.warn('PDF zu groß:', file.name, file.size);
+          tooLarge++;
+          continue;
+        }
         // PDF als Base64
         const b64 = await fileToBase64(file);
         payload = { pdfData: b64, fileName: file.name, type: 'pdf' };
@@ -893,16 +1153,22 @@ async function uploadDateien(event, carId, type) {
       });
 
       if (res.ok) { uploaded++; }
-      else { const e = await res.json(); console.error('Upload fehler:', e); failed++; }
+      else {
+        let msg = 'HTTP ' + res.status;
+        try { const e = await res.json(); if (e && e.error) msg = e.error; } catch (_) {}
+        console.error('Upload fehler:', msg);
+        if (res.status === 413) tooLarge++; else failed++;
+      }
     } catch (e) {
       console.error('Upload exception:', e); failed++;
     }
-    const total = uploaded + failed;
+    const total = uploaded + failed + tooLarge;
     if (bar) bar.style.width = Math.round((total / files.length) * 100) + '%';
   }
 
   if (progress) progress.classList.add('hidden');
   if (uploaded > 0) showToast(`${uploaded} Datei${uploaded > 1 ? 'en' : ''} hochgeladen ✅`);
+  if (tooLarge > 0) showToast(`${tooLarge} PDF(s) zu groß – max. ca. 36 MB`, '⚠️');
   if (failed > 0)   showToast(`${failed} Datei(en) fehlgeschlagen ❌`, '❌');
   loadCarDetail(carId);
 }
@@ -961,17 +1227,63 @@ function closeLightbox() {
   document.body.style.overflow = '';
 }
 
-function openPDF(url) {
-  const viewer = document.getElementById('pdf-viewer');
-  document.getElementById('pdf-frame').src = url;
+// PDF mit PDF.js rendern -> ALLE Seiten scrollbar (iframe zeigt auf iOS nur Seite 1)
+let pdfRenderToken = 0;
+async function openPDF(url) {
+  const viewer    = document.getElementById('pdf-viewer');
+  const container = document.getElementById('pdf-pages');
+  const openTab   = document.getElementById('pdf-open-tab');
+  if (openTab) openTab.href = url;
+
   viewer.classList.remove('hidden');
   viewer.classList.add('flex');
   document.body.style.overflow = 'hidden';
+  container.innerHTML = '<div class="text-dark-400 text-sm text-center py-12">Lädt …</div>';
+
+  // Fallback falls PDF.js (CDN) nicht geladen ist: in neuem Tab oeffnen
+  if (!window.pdfjsLib) {
+    container.innerHTML = '<div class="text-dark-300 text-sm text-center py-12">Viewer nicht verfügbar.<br><a class="text-brand-400 underline" href="' + url + '" target="_blank" rel="noopener">PDF in neuem Tab öffnen</a></div>';
+    return;
+  }
+
+  const token = ++pdfRenderToken;
+  try {
+    const pdf = await pdfjsLib.getDocument(url).promise;
+    if (token !== pdfRenderToken) return; // zwischenzeitlich anderes PDF/geschlossen
+    container.innerHTML = '';
+    const dpr  = window.devicePixelRatio || 1;
+    const maxW = Math.min(container.clientWidth || window.innerWidth, 1000) - 8;
+
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      if (token !== pdfRenderToken) return;
+      const base     = page.getViewport({ scale: 1 });
+      const scale    = maxW / base.width;
+      const viewport = page.getViewport({ scale: scale * dpr });
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      canvas.className = 'mx-auto mb-3 rounded shadow-lg bg-white max-w-full';
+      canvas.style.width  = (viewport.width  / dpr) + 'px';
+      canvas.style.height = (viewport.height / dpr) + 'px';
+      container.appendChild(canvas);
+
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      if (token !== pdfRenderToken) return;
+    }
+  } catch (e) {
+    console.error('PDF Fehler:', e);
+    if (token === pdfRenderToken) {
+      container.innerHTML = '<div class="text-danger-400 text-sm text-center py-12">PDF konnte nicht geladen werden.<br><a class="text-brand-400 underline" href="' + url + '" target="_blank" rel="noopener">In neuem Tab öffnen</a></div>';
+    }
+  }
 }
 
 function closePDF() {
   const viewer = document.getElementById('pdf-viewer');
-  document.getElementById('pdf-frame').src = '';
+  pdfRenderToken++; // laufendes Rendern stoppen
+  document.getElementById('pdf-pages').innerHTML = '';
   viewer.classList.add('hidden');
   viewer.classList.remove('flex');
   document.body.style.overflow = '';
@@ -1048,6 +1360,10 @@ async function openEditCarModal(id) {
   document.getElementById('f-sellerContact').value = car.sellerContact || '';
   document.getElementById('f-status').value        = car.status || 'visited';
   document.getElementById('f-notes').value         = car.notes || '';
+  document.getElementById('f-prevOwners').value      = car.previousOwners || '';
+  document.getElementById('f-scheckheft').value      = car.serviceHistory || '';
+  document.getElementById('f-lastServiceDate').value = car.lastServiceDate || '';
+  document.getElementById('f-lastServiceKm').value   = car.lastServiceKm || '';
   togglePrivateFields();
   toggleStatusFields();
 }
@@ -1076,6 +1392,10 @@ async function saveCar(e) {
     sourceLink: document.getElementById('f-link').value,
     sellerName: document.getElementById('f-seller').value,
     sellerContact: document.getElementById('f-sellerContact').value,
+    previousOwners: parseInt(document.getElementById('f-prevOwners').value) || null,
+    serviceHistory: document.getElementById('f-scheckheft').value,
+    lastServiceDate: document.getElementById('f-lastServiceDate').value || null,
+    lastServiceKm: parseInt(document.getElementById('f-lastServiceKm').value) || null,
     status,
     notes: document.getElementById('f-notes').value
   };
@@ -1345,19 +1665,24 @@ async function loadPot() {
   const tEmpty = document.getElementById('pot-empty');
   if (transactions.length === 0) { tDiv.innerHTML = ''; tEmpty.classList.remove('hidden'); return; }
   tEmpty.classList.add('hidden');
-  tDiv.innerHTML = transactions.sort((a,b) => new Date(b.date)-new Date(a.date)).map(t => `
+  tDiv.innerHTML = transactions.sort((a,b) => new Date(b.date)-new Date(a.date)).map(t => {
+    const isW  = t.type === 'withdrawal';
+    const who  = t.partnerId === 'both' ? 'Mert & Tobias' : partnerName(t.partnerId);
+    const titel = isW ? 'Entnahme – ' + who : 'Einzahlung von ' + who;
+    return `
     <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">
-      <div class="flex items-center gap-3"><span class="text-lg">💰</span>
+      <div class="flex items-center gap-3"><span class="text-lg">${isW ? '💸' : '💰'}</span>
         <div>
-          <div class="text-sm font-medium">Einzahlung von ${t.partnerId==='both'?'Mert & Tobias':t.partnerId.charAt(0).toUpperCase()+t.partnerId.slice(1)}</div>
+          <div class="text-sm font-medium">${titel}</div>
           <div class="text-xs text-dark-400">${fmtDate(t.date)}${t.note?' · '+t.note:''}</div>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <span class="font-bold text-accent-400">+${fmt(t.amount)}</span>
+        <span class="font-bold ${isW ? 'text-warn-400' : 'text-accent-400'}">${isW ? '−' : '+'}${fmt(t.amount)}</span>
         <button onclick="deletePotTransaction('${t.id}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function openDepositModal() {
@@ -1388,6 +1713,194 @@ async function deletePotTransaction(id) {
   await fetch(API + '/api/pot/transactions/' + id, { method: 'DELETE' });
   showToast('Transaktion gelöscht', '🗑️');
   loadPot();
+}
+
+function openWithdrawModal() {
+  document.getElementById('withdraw-modal').classList.remove('hidden');
+  document.getElementById('withdraw-form').reset();
+  document.getElementById('wd-date').value = new Date().toISOString().split('T')[0];
+}
+function closeWithdrawModal() { document.getElementById('withdraw-modal').classList.add('hidden'); }
+
+async function saveWithdraw(e) {
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById('wd-amount').value) || 0;
+  await fetch(API + '/api/pot/withdraw', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      amount,
+      partnerId: document.getElementById('wd-partner').value,
+      date: document.getElementById('wd-date').value,
+      note: document.getElementById('wd-note').value
+    })
+  });
+  closeWithdrawModal();
+  showToast('Entnahme gebucht 💸');
+  loadPot();
+}
+
+// ── ALLGEMEINE KOSTEN ──────────────────────────────────────
+async function loadCosts() {
+  const data  = await fetch(API + '/api/general-expenses').then(r => r.json());
+  const stats = await fetch(API + '/api/stats').then(r => r.json());
+  document.getElementById('nav-pot').textContent = fmt(stats.potBalance);
+
+  const expenses  = data.expenses  || [];
+  const recurring = data.recurring || [];
+  const offen = expenses.filter(e => e.funding_source === 'private' && !e.reimbursed)
+                        .reduce((s, e) => s + (e.amount || 0), 0);
+  const aktiveRegeln = recurring.filter(r => r.active);
+
+  document.getElementById('costs-total').textContent = fmt(data.totalOverhead);
+  document.getElementById('costs-open').textContent  = fmt(offen);
+  document.getElementById('costs-recurring-count').textContent = aktiveRegeln.length;
+
+  // Daueraufträge
+  const recDiv   = document.getElementById('costs-recurring');
+  const recEmpty = document.getElementById('costs-recurring-empty');
+  if (recurring.length === 0) {
+    recDiv.innerHTML = ''; recEmpty.classList.remove('hidden');
+  } else {
+    recEmpty.classList.add('hidden');
+    recDiv.innerHTML = recurring.map(r => `
+      <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group ${r.active ? '' : 'opacity-50'}">
+        <div class="flex items-center gap-3">
+          <span class="text-lg">${gexpCatIcons[r.category] || '📦'}</span>
+          <div>
+            <div class="text-sm font-medium">${gexpCatLabels[r.category] || r.category}${r.note ? ' · ' + r.note : ''}</div>
+            <div class="text-xs text-dark-400">
+              jeden ${r.day_of_month}. · ${r.funding_source === 'pot' ? '💰 Pot' : '👤 ' + partnerName(r.paid_by)}
+              ${r.active ? '' : ' · <span class="text-danger-400">gestoppt</span>'}
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm">${fmt(r.amount)}/Mon.</span>
+          ${r.active ? `<button onclick="stopRecurring('${r.id}')" class="text-xs bg-warn-400/20 text-warn-400 px-2 py-0.5 rounded hover:bg-warn-400/30 transition">Stoppen</button>` : ''}
+          <button onclick="deleteRecurring('${r.id}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm">🗑️</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // Einzelbuchungen
+  const list  = document.getElementById('costs-list');
+  const empty = document.getElementById('costs-empty');
+  if (expenses.length === 0) {
+    list.innerHTML = ''; empty.classList.remove('hidden'); return;
+  }
+  empty.classList.add('hidden');
+  list.innerHTML = expenses.map(e => `
+    <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-3 group">
+      <div class="flex items-center gap-3">
+        <span class="text-lg">${gexpCatIcons[e.category] || '📦'}</span>
+        <div>
+          <div class="text-sm font-medium">${gexpCatLabels[e.category] || e.category}${e.auto_generated ? ' <span class="text-xs text-brand-400">🔁 auto</span>' : ''}</div>
+          <div class="text-xs text-dark-400">${fmtDate(e.date)} · ${e.funding_source === 'pot' ? 'Pot' : '👤 ' + partnerName(e.paid_by)}${e.note ? ' · ' + e.note : ''}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-sm text-danger-400">−${fmt(e.amount)}</span>
+        ${e.funding_source === 'private' && !e.reimbursed ? `<button onclick="reimburseGeneralExpense('${e.id}')" class="text-xs bg-warn-400/20 text-warn-400 px-2 py-0.5 rounded hover:bg-warn-400/30 transition">Offen</button>` : ''}
+        ${e.reimbursed ? '<span class="text-xs text-accent-400">✓ erstattet</span>' : ''}
+        <button onclick="deleteGeneralExpense('${e.id}')" class="text-dark-500 hover:text-danger-400 opacity-0 group-hover:opacity-100 transition text-sm">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function toggleGexpPaidBy() {
+  document.getElementById('gexp-paidby-wrap').classList.toggle('hidden', document.getElementById('gexp-funding').value !== 'private');
+}
+function openGeneralExpenseModal() {
+  document.getElementById('gexp-modal').classList.remove('hidden');
+  document.getElementById('gexp-form').reset();
+  document.getElementById('gexp-date').value = new Date().toISOString().split('T')[0];
+  toggleGexpPaidBy();
+}
+function closeGeneralExpenseModal() { document.getElementById('gexp-modal').classList.add('hidden'); }
+
+async function saveGeneralExpense(e) {
+  e.preventDefault();
+  await fetch(API + '/api/general-expenses', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      category: document.getElementById('gexp-category').value,
+      amount: parseFloat(document.getElementById('gexp-amount').value) || 0,
+      fundingSource: document.getElementById('gexp-funding').value,
+      paidBy: document.getElementById('gexp-paidby').value,
+      date: document.getElementById('gexp-date').value,
+      note: document.getElementById('gexp-note').value
+    })
+  });
+  closeGeneralExpenseModal();
+  showToast('Kosten erfasst');
+  loadCosts();
+}
+
+async function deleteGeneralExpense(id) {
+  if (!confirm('Kostenbuchung löschen?')) return;
+  await fetch(API + '/api/general-expenses/' + id, { method: 'DELETE' });
+  showToast('Buchung gelöscht', '🗑️');
+  loadCosts();
+}
+
+async function reimburseGeneralExpense(id) {
+  if (!confirm('Erstattung als erledigt markieren?')) return;
+  await fetch(API + '/api/general-expenses/' + id + '/reimburse', { method: 'POST' });
+  showToast('Erstattung markiert ✅');
+  loadCosts();
+}
+
+// Wiederkehrende Regeln
+function toggleRecPaidBy() {
+  document.getElementById('rec-paidby-wrap').classList.toggle('hidden', document.getElementById('rec-funding').value !== 'private');
+}
+function openRecurringModal() {
+  document.getElementById('recurring-modal').classList.remove('hidden');
+  document.getElementById('recurring-form').reset();
+  document.getElementById('rec-start').value = new Date().toISOString().split('T')[0];
+  document.getElementById('rec-day').value = '1';
+  toggleRecPaidBy();
+}
+function closeRecurringModal() { document.getElementById('recurring-modal').classList.add('hidden'); }
+
+async function saveRecurring(e) {
+  e.preventDefault();
+  await fetch(API + '/api/recurring-expenses', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      category: document.getElementById('rec-category').value,
+      amount: parseFloat(document.getElementById('rec-amount').value) || 0,
+      fundingSource: document.getElementById('rec-funding').value,
+      paidBy: document.getElementById('rec-paidby').value,
+      startDate: document.getElementById('rec-start').value,
+      dayOfMonth: parseInt(document.getElementById('rec-day').value) || 1,
+      note: document.getElementById('rec-note').value
+    })
+  });
+  closeRecurringModal();
+  showToast('Dauerauftrag angelegt 🔁');
+  loadCosts();
+}
+
+async function stopRecurring(id) {
+  if (!confirm('Dauerauftrag stoppen? Bisherige Buchungen bleiben erhalten, es werden nur keine neuen Monate mehr gebucht.')) return;
+  await fetch(API + '/api/recurring-expenses/' + id + '/stop', { method: 'POST' });
+  showToast('Dauerauftrag gestoppt');
+  loadCosts();
+}
+
+async function deleteRecurring(id) {
+  const mitBuchungen = confirm('Dauerauftrag LÖSCHEN.\n\nOK = inkl. aller automatisch erzeugten Buchungen entfernen (komplett rückgängig).\nAbbrechen = nur die Regel löschen, bereits gebuchte Monate behalten.');
+  // Sicherheitsabfrage in zwei Stufen, damit nichts versehentlich verschwindet
+  if (mitBuchungen) {
+    if (!confirm('Wirklich ALLE automatischen Buchungen dieses Dauerauftrags löschen?')) return;
+    await fetch(API + '/api/recurring-expenses/' + id + '?withBookings=1', { method: 'DELETE' });
+    showToast('Dauerauftrag + Buchungen gelöscht', '🗑️');
+  } else {
+    await fetch(API + '/api/recurring-expenses/' + id, { method: 'DELETE' });
+    showToast('Regel gelöscht (Buchungen behalten)', '🗑️');
+  }
+  loadCosts();
 }
 
 showPage('dashboard');

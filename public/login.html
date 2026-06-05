@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AutoTracker">
+  <title>🚗 AutoTracker – Login</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #020617; color: #e2e8f0; padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .card {
+      width: 100%; max-width: 360px; background: #0f172a; border: 1px solid #1e293b;
+      border-radius: 20px; padding: 32px 24px; box-shadow: 0 20px 50px rgba(0,0,0,.5);
+    }
+    .logo {
+      width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, #6366f1, #4338ca);
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
+    }
+    h1 { text-align: center; font-size: 20px; margin: 0 0 4px; font-weight: 700; }
+    p.sub { text-align: center; color: #64748b; font-size: 13px; margin: 0 0 24px; }
+    input {
+      width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 12px; padding: 14px 16px; font-size: 16px; outline: none;
+    }
+    input:focus { border-color: #6366f1; }
+    button {
+      width: 100%; margin-top: 14px; background: #4f46e5; color: #fff; border: none;
+      border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+    button:active { background: #4338ca; }
+    .err { color: #f87171; font-size: 13px; text-align: center; min-height: 18px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <form class="card" onsubmit="return login(event)">
+    <div class="logo">🚗</div>
+    <h1>AutoTracker</h1>
+    <p class="sub">Bitte Passwort eingeben</p>
+    <input id="pw" type="password" placeholder="Passwort" autofocus autocomplete="current-password">
+    <button type="submit">Anmelden</button>
+    <div class="err" id="err"></div>
+  </form>
+  <script>
+    async function login(e) {
+      e.preventDefault();
+      const pw  = document.getElementById('pw').value;
+      const err = document.getElementById('err');
+      err.textContent = '';
+      try {
+        const r = await fetch('/tracker/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        });
+        if (r.ok) {
+          location.replace('/tracker/');
+        } else {
+          err.textContent = 'Falsches Passwort';
+          document.getElementById('pw').value = '';
+        }
+      } catch (_) {
+        err.textContent = 'Fehler – bitte erneut versuchen';
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>
