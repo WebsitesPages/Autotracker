@@ -44,6 +44,26 @@ router.post('/api/general-expenses', (req, res) => {
   res.json(expense);
 });
 
+router.put('/api/general-expenses/:id', (req, res) => {
+  const existing = gexpRepo.get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  const body = req.body || {};
+  const fundingSource = v.oneOf(body.fundingSource, ['pot', 'private'], 'Bezahlt aus', existing.funding_source);
+  const data = gexpRepo.update(req.params.id, {
+    category: v.oneOf(body.category, CATEGORIES, 'Kategorie', existing.category),
+    amount: body.amount !== undefined ? v.amount(body.amount) : existing.amount,
+    funding_source: fundingSource,
+    paid_by: fundingSource === 'private'
+      ? v.oneOf(body.paidBy || existing.paid_by, PARTNER_IDS, 'Bezahlt von')
+      : '',
+    date: v.optionalDate(body.date, 'Datum', existing.date),
+    note: body.note !== undefined ? v.str(body.note, 'Notiz', { max: 500 }) : existing.note
+  });
+  audit.log(req, 'overhead.update', data.id, `Kosten ${data.category} ${data.amount} € bearbeitet`);
+  res.json(data);
+});
+
 router.delete('/api/general-expenses/:id', (req, res) => {
   const exp = gexpRepo.get(req.params.id);
   gexpRepo.remove(req.params.id);

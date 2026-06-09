@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Field, Input, Select, Segmented } from '../ui/Field';
 import { useToast } from '../ui/Toast';
+import type { CarExpense } from '../types';
 
 interface Suggestion { lat: string; lon: string; label: string; detail: string }
 interface Coords { lat: number; lon: number }
@@ -85,20 +86,21 @@ function AddressInput({ label, icon, onSelect }: {
   );
 }
 
-export function ExpenseForm({ carId, onClose, onSaved }: {
+export function ExpenseForm({ carId, expense, onClose, onSaved }: {
   carId: string;
+  expense?: CarExpense; // gesetzt = bestehende Ausgabe bearbeiten
   onClose: () => void;
   onSaved: () => void;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({
-    category: 'reparatur',
-    amount: '',
-    fundingSource: 'pot' as 'pot' | 'private',
-    paidBy: 'mert' as 'mert' | 'tobias',
-    date: today(),
-    note: ''
+    category: expense?.category ?? 'reparatur',
+    amount: expense?.amount.toString() ?? '',
+    fundingSource: (expense?.fundingSource ?? 'pot') as 'pot' | 'private',
+    paidBy: (expense?.paidBy === 'tobias' ? 'tobias' : 'mert') as 'mert' | 'tobias',
+    date: expense?.date ?? today(),
+    note: expense?.note ?? ''
   });
 
   // Tankrechner
@@ -133,15 +135,20 @@ export function ExpenseForm({ carId, onClose, onSaved }: {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.addExpense(carId, {
+      const data = {
         category: f.category,
         amount: parseFloat(f.amount) || 0,
         fundingSource: f.fundingSource,
         paidBy: f.fundingSource === 'private' ? f.paidBy : '',
         date: f.date,
         note: f.note
-      });
-      toast('Ausgabe hinzugefügt');
+      };
+      if (expense) {
+        await api.updateExpense(carId, expense.id, data);
+      } else {
+        await api.addExpense(carId, data);
+      }
+      toast(expense ? 'Ausgabe aktualisiert' : 'Ausgabe hinzugefügt');
       onSaved();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Speichern fehlgeschlagen', 'error');
@@ -151,7 +158,7 @@ export function ExpenseForm({ carId, onClose, onSaved }: {
   }
 
   return (
-    <Modal title="Ausgabe hinzufügen" icon={<Banknote />} onClose={onClose}>
+    <Modal title={expense ? 'Ausgabe bearbeiten' : 'Ausgabe hinzufügen'} icon={<Banknote />} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Kategorie">
           <Select value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))}>
@@ -250,7 +257,7 @@ export function ExpenseForm({ carId, onClose, onSaved }: {
         </Field>
 
         <Button type="submit" variant="primary" className="w-full" disabled={busy}>
-          {busy ? 'Speichern …' : 'Ausgabe speichern'}
+          {busy ? 'Speichern …' : expense ? 'Änderungen speichern' : 'Ausgabe speichern'}
         </Button>
       </form>
     </Modal>

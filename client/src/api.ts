@@ -65,6 +65,8 @@ export const api = {
 
   // Fahrzeug-Ausgaben
   addExpense: (carId: string, data: Partial<CarExpense>) => post<CarExpense>(`api/cars/${carId}/expenses`, data),
+  updateExpense: (carId: string, expId: string, data: Partial<CarExpense>) =>
+    put<CarExpense>(`api/cars/${carId}/expenses/${expId}`, data),
   deleteExpense: (carId: string, expId: string) => del<{ success: boolean }>(`api/cars/${carId}/expenses/${expId}`),
   reimburseExpense: (carId: string, expId: string) => post<CarExpense>(`api/cars/${carId}/expenses/${expId}/reimburse`),
 
@@ -85,6 +87,8 @@ export const api = {
   generalExpenses: () => get<GeneralExpensesResponse>('api/general-expenses'),
   createGeneralExpense: (data: { category: string; amount: number; fundingSource: string; paidBy?: string; date?: string; note?: string }) =>
     post<GeneralExpense>('api/general-expenses', data),
+  updateGeneralExpense: (id: string, data: { category?: string; amount?: number; fundingSource?: string; paidBy?: string; date?: string; note?: string }) =>
+    put<GeneralExpense>(`api/general-expenses/${id}`, data),
   deleteGeneralExpense: (id: string) => del<{ success: boolean }>(`api/general-expenses/${id}`),
   reimburseGeneralExpense: (id: string) => post<GeneralExpense>(`api/general-expenses/${id}/reimburse`),
   createRecurring: (data: { category: string; amount: number; fundingSource: string; paidBy?: string; startDate?: string; dayOfMonth?: number; note?: string }) =>

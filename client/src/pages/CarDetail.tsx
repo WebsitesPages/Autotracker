@@ -17,7 +17,7 @@ import { CarForm } from '../modals/CarForm';
 import { ExpenseForm } from '../modals/ExpenseForm';
 import { SellForm } from '../modals/SellForm';
 import { FilesSection } from '../files/FilesSection';
-import type { Car } from '../types';
+import type { Car, CarExpense } from '../types';
 
 export function CarDetail({ carId, onBack }: { carId: string; onBack: () => void }) {
   const toast = useToast();
@@ -25,6 +25,7 @@ export function CarDetail({ carId, onBack }: { carId: string; onBack: () => void
   const { bump } = useRefresh();
   const [car, setCar] = useState<Car | null>(null);
   const [modal, setModal] = useState<'edit' | 'expense' | 'sell' | 'buy' | null>(null);
+  const [editingExpense, setEditingExpense] = useState<CarExpense | null>(null);
 
   const reload = useCallback(() => {
     api.car(carId).then(setCar).catch(() => onBack());
@@ -229,7 +230,11 @@ export function CarDetail({ carId, onBack }: { carId: string; onBack: () => void
                       </button>
                     )}
                     {e.reimbursed && <Check size={14} className="text-emerald-400" />}
-                    <button onClick={() => deleteExpense(e.id)}
+                    <button onClick={() => setEditingExpense(e)} title="Bearbeiten"
+                      className="text-night-500 hover:text-gold-300 sm:opacity-0 group-hover:opacity-100 transition p-0.5">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => deleteExpense(e.id)} title="Löschen"
                       className="text-night-500 hover:text-rose-400 sm:opacity-0 group-hover:opacity-100 transition p-0.5">
                       <Trash2 size={14} />
                     </button>
@@ -264,6 +269,11 @@ export function CarDetail({ carId, onBack }: { carId: string; onBack: () => void
       )}
       {modal === 'expense' && (
         <ExpenseForm carId={car.id} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
+      )}
+      {editingExpense && (
+        <ExpenseForm carId={car.id} expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onSaved={() => { setEditingExpense(null); refresh(); }} />
       )}
       {modal === 'sell' && (
         <SellForm car={car} onClose={() => setModal(null)} onSold={() => { setModal(null); refresh(); }} />

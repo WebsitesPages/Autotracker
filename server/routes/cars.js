@@ -146,6 +146,34 @@ router.post('/api/cars/:id/expenses', (req, res) => {
   res.json(expense);
 });
 
+router.put('/api/cars/:carId/expenses/:expId', (req, res) => {
+  const car = carsRepo.get(req.params.carId);
+  if (!car) return res.status(404).json({ error: 'Nicht gefunden' });
+  const existing = (car.expenses || []).find(e => e.id === req.params.expId);
+  if (!existing) return res.status(404).json({ error: 'Ausgabe nicht gefunden' });
+
+  const body = req.body || {};
+  const fundingSource = v.oneOf(body.fundingSource, ['pot', 'private'], 'Bezahlt aus', existing.fundingSource);
+  const updated = {
+    ...existing,
+    category: v.oneOf(body.category, EXPENSE_CATEGORIES, 'Kategorie', existing.category),
+    amount: body.amount !== undefined ? v.amount(body.amount) : existing.amount,
+    fundingSource,
+    paidBy: fundingSource === 'private'
+      ? v.oneOf(body.paidBy || existing.paidBy, PARTNER_IDS, 'Bezahlt von')
+      : '',
+    date: v.optionalDate(body.date, 'Datum', existing.date),
+    note: body.note !== undefined ? v.str(body.note, 'Notiz', { max: 500 }) : existing.note
+  };
+
+  carsRepo.update(req.params.carId, {
+    expenses: (car.expenses || []).map(e => (e.id === existing.id ? updated : e))
+  });
+  audit.log(req, 'car.expense.update', car.id,
+    `${carName(car)}: Ausgabe ${updated.category} ${updated.amount} € bearbeitet`);
+  res.json(updated);
+});
+
 router.delete('/api/cars/:carId/expenses/:expId', (req, res) => {
   const car = carsRepo.get(req.params.carId);
   if (!car) return res.status(404).json({ error: 'Nicht gefunden' });

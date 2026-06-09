@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Repeat, Receipt, Trash2, Check, OctagonPause } from 'lucide-react';
+import { Plus, Repeat, Receipt, Trash2, Check, OctagonPause, Pencil } from 'lucide-react';
 import { api } from '../api';
 import { fmtDate, fmtEur, generalCategories, partnerName, today } from '../format';
 import { Card, CardTitle, StatCard } from '../ui/Card';
@@ -10,7 +10,7 @@ import { Empty, Spinner } from '../ui/Misc';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/Confirm';
 import { useRefresh } from '../refresh';
-import type { GeneralExpensesResponse } from '../types';
+import type { GeneralExpense, GeneralExpensesResponse } from '../types';
 
 export function Costs() {
   const toast = useToast();
@@ -18,6 +18,7 @@ export function Costs() {
   const { tick, bump } = useRefresh();
   const [data, setData] = useState<GeneralExpensesResponse | null>(null);
   const [modal, setModal] = useState<'expense' | 'recurring' | null>(null);
+  const [editing, setEditing] = useState<GeneralExpense | null>(null);
 
   useEffect(() => {
     api.generalExpenses().then(setData).catch(() => {});
@@ -179,7 +180,11 @@ export function Costs() {
                     </button>
                   )}
                   {e.reimbursed && <Check size={14} className="text-emerald-400" />}
-                  <button onClick={() => deleteExpense(e.id)}
+                  <button onClick={() => setEditing(e)} title="Bearbeiten"
+                    className="text-night-500 hover:text-gold-300 sm:opacity-0 group-hover:opacity-100 transition p-0.5">
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => deleteExpense(e.id)} title="Löschen"
                     className="text-night-500 hover:text-rose-400 sm:opacity-0 group-hover:opacity-100 transition p-0.5">
                     <Trash2 size={14} />
                   </button>
@@ -193,6 +198,11 @@ export function Costs() {
       {modal === 'expense' && (
         <GeneralExpenseModal onClose={() => setModal(null)} onSaved={() => { setModal(null); bump(); }} />
       )}
+      {editing && (
+        <GeneralExpenseModal expense={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); bump(); }} />
+      )}
       {modal === 'recurring' && (
         <RecurringModal onClose={() => setModal(null)} onSaved={() => { setModal(null); bump(); }} />
       )}
@@ -200,27 +210,40 @@ export function Costs() {
   );
 }
 
-function GeneralExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function GeneralExpenseModal({ expense, onClose, onSaved }: {
+  expense?: GeneralExpense; // gesetzt = bestehende Buchung bearbeiten
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({
-    category: 'server', amount: '', fundingSource: 'pot' as 'pot' | 'private',
-    paidBy: 'mert' as 'mert' | 'tobias', date: today(), note: ''
+    category: expense?.category ?? 'server',
+    amount: expense?.amount.toString() ?? '',
+    fundingSource: (expense?.funding_source ?? 'pot') as 'pot' | 'private',
+    paidBy: (expense?.paid_by === 'tobias' ? 'tobias' : 'mert') as 'mert' | 'tobias',
+    date: expense?.date ?? today(),
+    note: expense?.note ?? ''
   });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.createGeneralExpense({
+      const data = {
         category: f.category,
         amount: parseFloat(f.amount) || 0,
         fundingSource: f.fundingSource,
         paidBy: f.paidBy,
         date: f.date,
         note: f.note
-      });
-      toast('Kosten erfasst');
+      };
+      if (expense) {
+        await api.updateGeneralExpense(expense.id, data);
+      } else {
+        await api.createGeneralExpense(data);
+      }
+      toast(expense ? 'Buchung aktualisiert' : 'Kosten erfasst');
       onSaved();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Fehler beim Speichern', 'error');
@@ -230,7 +253,7 @@ function GeneralExpenseModal({ onClose, onSaved }: { onClose: () => void; onSave
   }
 
   return (
-    <Modal title="Allgemeine Kosten erfassen" icon={<Receipt />} onClose={onClose}>
+    <Modal title={expense ? 'Buchung bearbeiten' : 'Allgemeine Kosten erfassen'} icon={<Receipt />} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Kategorie">
           <Select value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))}>
@@ -260,7 +283,7 @@ function GeneralExpenseModal({ onClose, onSaved }: { onClose: () => void; onSave
           <Input value={f.note} onChange={e => setF(p => ({ ...p, note: e.target.value }))} placeholder="z.B. Hetzner Server Juni" />
         </Field>
         <Button type="submit" variant="primary" className="w-full" disabled={busy}>
-          {busy ? 'Speichern …' : 'Kosten speichern'}
+          {busy ? 'Speichern …' : expense ? 'Änderungen speichern' : 'Kosten speichern'}
         </Button>
       </form>
     </Modal>
