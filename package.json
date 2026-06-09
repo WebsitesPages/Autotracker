@@ -1,19 +1,19 @@
 {
   "name": "auto-tracker",
-  "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "AutoTracker – Auto-Handel Tracking für Mert & Tobias",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
-    "migrate": "node migrate.js"
+    "start": "node server/index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
-    "cors": "^2.8.6",
     "express": "^5.2.1"
   }
 }

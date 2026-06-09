@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+
+  /* Tiefes, neutrales Graphit – bewusst ohne Blaustich */
+  --color-night-950: #07080a;
+  --color-night-900: #0b0c0e;
+  --color-night-850: #101113;
+  --color-night-800: #151619;
+  --color-night-700: #1d1f23;
+  --color-night-600: #2a2c32;
+  --color-night-500: #3b3e46;
+  --color-night-400: #5b5f6a;
+  --color-night-300: #868b97;
+  --color-night-200: #b9bdc7;
+  --color-night-100: #e4e6eb;
+  --color-night-50: #f5f6f8;
+
+  /* Signatur-Akzent: Champagner-Gold */
+  --color-gold-200: #f0debc;
+  --color-gold-300: #e4c98f;
+  --color-gold-400: #d6b067;
+  --color-gold-500: #c79a48;
+  --color-gold-600: #a87d33;
+  --color-gold-700: #826024;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #0b0c0e;
+  color: var(--color-night-100);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  overscroll-behavior-y: none;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2c32 transparent;
+}
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2c32; border-radius: 99px; }
+
+/* Sanftes Einblenden von Seiteninhalten */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.rise { animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.overlay-in { animation: overlay-in 0.2s ease-out; }
+.sheet-in { animation: sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* iOS: native Datumsfelder respektieren sonst die Breite nicht */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+/* Safe-Area für iPhone-Homescreen-App (Notch + Home-Indicator) */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }

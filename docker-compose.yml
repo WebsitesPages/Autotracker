@@ -15,6 +15,8 @@ services:
       # (NICHT im Git, siehe .gitignore). Beispiel in .env.example.
       - APP_PASSWORD=${APP_PASSWORD:-changeme}
       - AUTH_SECRET=${AUTH_SECRET:-dev-only-insecure-secret-change-me}
+      # Cookie-Pfad muss zum nginx-Unterpfad passen (autoscanner.space/tracker)
+      - COOKIE_PATH=/tracker
     volumes:
       # SQLite-DB UND Uploads liegen in ./data und bleiben so erhalten
       - ./data:/app/data

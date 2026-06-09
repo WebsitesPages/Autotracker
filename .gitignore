@@ -13,3 +13,8 @@ pot.csv
 
 # Logs
 *.log
+
+# Frontend-Build (entsteht im Docker-Build)
+client/node_modules/
+client/dist/
+public/

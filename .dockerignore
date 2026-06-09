@@ -1,5 +1,10 @@
 .git
 node_modules
+client/node_modules
+client/dist
+public
 data
+.env
 npm-debug.log
 *.log
+README.md

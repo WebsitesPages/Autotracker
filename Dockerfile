@@ -1,3 +1,12 @@
+# ── Stage 1: Frontend bauen (Vite + React) ──────────────────────────────────
+FROM node:20-bookworm AS client-build
+WORKDIR /build
+COPY client/package.json client/package-lock.json* ./
+RUN npm install
+COPY client/ ./
+RUN npm run build
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
 # Volles Debian-Image, damit better-sqlite3 zur Not nativ kompiliert werden kann
 FROM node:20-bookworm
 
@@ -12,8 +21,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
-# Restlichen Code kopieren
-COPY . .
+# Server-Code + gebautes Frontend
+COPY server/ ./server/
+COPY --from=client-build /build/dist ./public
 
 # Datenverzeichnis (wird per Volume überschrieben/persistiert)
 ENV DATA_DIR=/app/data
@@ -22,4 +32,4 @@ RUN mkdir -p /app/data
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "server/index.js"]
